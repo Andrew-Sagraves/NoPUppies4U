@@ -2,12 +2,12 @@
 
 ## Description: 
 
-This only works on Debian systems.
+This only works on Debian systems. (Ubuntu)
 This programs opens the /etc/apt/sources.list file but it requires root permission
 
 ## Usage:
 
-gcc jdong11.c -o main
+./compile.sh
 ./main
 
 ## Tech Used:
