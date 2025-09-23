@@ -7,7 +7,7 @@
 
 using namespace std;
 
-int main(int argc, **char argv) {
+int main(int argc, char **argv) {
 	
 	/*
 		- Check to see if argv[i] is a valid --(command)
@@ -34,7 +34,7 @@ int main(int argc, **char argv) {
 	int opt = 0;
 	int options_index = 0;
 	
-	while ((opt = getopt_long(argc, argv, "", long_options, &option_index)) != -1) {
+	while ((opt = getopt_long(argc, argv, "", long_options, &options_index)) != -1) {
 		switch (opt) {
 			case 'h':
 				cout << "Usage: nopuppies4u [options]" << endl;
