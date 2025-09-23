@@ -4,6 +4,8 @@
 //#include "main.hpp"
 //#include "asagrave.h"
 #include <getopt.h> 
+#include "jdong11.h"
+
 
 using namespace std;
 
@@ -27,14 +29,19 @@ int main(int argc, char* argv[]) {
 		{"crontab", no_argument,	0, 'c'},
 		{"sudo", no_argument,		0, 's'},
 		{"path", no_argument,		0, 'p'},
-
+		{"all", no_argument,		0, 'a'},
 		{0, 0, 0, 0}
 	};
 	
 	int opt = 0;
 	int options_index = 0;
 	
-	while ((opt = getopt_long(argc, argv, "", long_options, &options_index)) != -1) {
+	if (optind == 1) {
+		cout << "Usage: nopuppies4u [options]" << endl;
+		return 0;
+	}
+	
+	while ((opt = getopt_long(argc, argv, "hvscp", long_options, &options_index)) != -1) { //hvscp lets short options work, like -s
 		switch (opt) {
 			case 'h':
 				cout << "Usage: nopuppies4u [options]" << endl;
@@ -46,8 +53,11 @@ int main(int argc, char* argv[]) {
 				cout << "	-p,   --path		Check path" << endl;
 				return 0;
 				break;
+			case 'a':
+				
+				break;
 			case 'v':
-			
+				
 				break;
 			case 'o':
 				
@@ -59,10 +69,10 @@ int main(int argc, char* argv[]) {
 				
 				break;
 			case 'p':
-			
+				
 				break;
 			case '?': //apparently occurs when it gets an unknown flag? 
-				cerr << "Error: invalid argument '" << argv[optind - 1] << "'\n";  
+				//cerr << "Error: invalid argument '" << argv[optind - 1] << "'\n";  
 			default:
 				return 1;
 		}
