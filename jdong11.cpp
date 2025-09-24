@@ -44,7 +44,7 @@ void check_sources_list() {
     file.clear(); // clear any error flags
     file.seekg(0, ios::beg); // reset file pointer to beginning
 
-    // parse the file line by line for deb822 which means the actual sources are in a different path
+    // parse the file line by line for deb822 which means the actual sources are in a different path Ubuntu 22.04+
     while (getline(file, line)) {
         if (line.find("deb822") != string::npos) {
             cout << "Found deb822 format, switching to ubuntu.sources file..." << endl;
@@ -106,4 +106,45 @@ void check_sources_list() {
 
     file.close();
     cout << "!!! Num Unknown sources: " << numUnknownSources << " ^^^" << endl << endl;
+}
+
+void check_sudo() {
+    // Open /etc/group file to check sudo group members
+    ifstream file("/etc/group");
+    if (file.fail()) {
+        cerr << "/etc/group failed to open." << endl;
+        return;
+    }
+
+    string line;
+    stringstream sin;
+    string user;
+    bool comma = true;
+    
+    while (getline(file, line)) {
+        if (line.find("sudo:") != string::npos) {
+            // gets skips sudo:x:27:
+            line = line.substr(line.find(":") + 1); 
+            line = line.substr(line.find(":") + 1);
+            line = line.substr(line.find(":") + 1);
+            
+            // put line into stringstream for parsing
+            sin.str(line);
+            sin.clear();
+            
+            // parsing the comma-separated list of users into terminal
+            cout << "!!! Users in sudo group: ";
+            while (getline(sin, user, ',')) {
+                if (comma) {
+                    cout << user;
+                    comma = false;
+                }
+                else {
+                    cout << ", " << user;
+                }
+            }
+            cout << endl << endl;
+        }
+    }
+    file.close();    
 }
