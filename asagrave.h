@@ -13,6 +13,9 @@ int get_path_vulnerabilities(std::vector<std::string>);
 // determines if a specific directory has a path vulneraility
 bool path_directory_has_vulnerability(std::string);
 
-// takes in a directory and determins if it is world-writeable
-bool is_world_writable(std::string);
+// takes in a directory and determines if it is world-writeable
+bool directory_is_world_writable(std::string);
+
+// takes in a directory and determines if it is relative
+bool directory_is_relative(std::string);
 #endif
