@@ -13,8 +13,14 @@ bool pathutil_is_world_writable_dir(const std::string& dir);
 // Check if a directory string is relative (".", empty, or not starting with '/')
 bool pathutil_is_relative_dir(const std::string& dir);
 
+// Struct to hold vulnerability result
+struct PathVulnResult {
+    bool vulnerable;
+    std::string reason;
+};
+
 // Check if a specific directory has a vulnerability
-bool pathutil_dir_has_vulnerability(const std::string& dir);
+PathVulnResult pathutil_dir_has_vulnerability(const std::string& dir);
 
 // Scan PATH entries and log vulnerabilities to PATH.txt
 // Returns the number of problems found
