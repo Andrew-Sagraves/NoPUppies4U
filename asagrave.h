@@ -1,21 +1,24 @@
 #ifndef ASAGRAVE_H
-#define ASAGRAVE_H 
+#define ASAGRAVE_H
 
+#include <string>
 #include <vector>
 
-// calls the $PATH system variable and returns the directories inside $PATH as a vector of strings
+// Retrieve the $PATH entries as a vector of strings
 std::vector<std::string> get_paths();
 
+// Check if a directory (and its parents) are world-writable
+bool pathutil_is_world_writable_dir(const std::string& dir);
 
-// takes in a vector of strings and outputs a return code along with a file output if necesary
-int get_path_vulnerabilities(std::vector<std::string>);
+// Check if a directory string is relative (".", empty, or not starting with '/')
+bool pathutil_is_relative_dir(const std::string& dir);
 
-// determines if a specific directory has a path vulneraility
-bool path_directory_has_vulnerability(std::string);
+// Check if a specific directory has a vulnerability
+bool pathutil_dir_has_vulnerability(const std::string& dir);
 
-// takes in a directory and determines if it is world-writeable
-bool directory_is_world_writable(std::string);
+// Scan PATH entries and log vulnerabilities to PATH.txt
+// Returns the number of problems found
+int get_path_vulnerabilities(const std::vector<std::string>& paths);
 
-// takes in a directory and determines if it is relative
-bool directory_is_relative(std::string);
-#endif
+#endif // ASAGRAVE_H
+
