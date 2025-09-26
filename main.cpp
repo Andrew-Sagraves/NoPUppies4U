@@ -4,8 +4,10 @@
 //#include "main.hpp"
 //#include "asagrave.h"
 #include <getopt.h> 
+#include "asagrave.h"
+#include "bmulli21.h"
 #include "jdong11.h"
-
+#include <vector>
 
 using namespace std;
 
@@ -29,6 +31,7 @@ int main(int argc, char* argv[]) {
 		{"crontab", no_argument,	0, 'c'},
 		{"sudo", no_argument,		0, 's'},
 		{"path", no_argument,		0, 'p'},
+		{"sources", no_argument,	0, 'x'},
 		{"all", no_argument,		0, 'a'},
 		{0, 0, 0, 0}
 	};
@@ -36,12 +39,14 @@ int main(int argc, char* argv[]) {
 	int opt = 0;
 	int options_index = 0;
 	
-	if (optind == 1) {
+	if (argc == 1) {
 		cout << "Usage: nopuppies4u [options]" << endl;
 		return 0;
 	}
 	
-	while ((opt = getopt_long(argc, argv, "hvscp", long_options, &options_index)) != -1) { //hvscp lets short options work, like -s
+	while ((opt = getopt_long(argc, argv, "hvscpxa", long_options, &options_index)) != -1) { //hvscp lets short options work, like -s
+		//you have to make sure to add any additional options to that ""
+		
 		switch (opt) {
 			case 'h':
 				cout << "Usage: nopuppies4u [options]" << endl;
@@ -50,11 +55,19 @@ int main(int argc, char* argv[]) {
 				cout << "	-v,   --verbose 		Enable verbose output" << endl;
 				cout << "	-c,   --crontab		Check crontab" << endl;
 				cout << "	-s,   --sudo		Check sudo permissions" << endl;
+				cout << "	-x,   --sources		Check all sources" << endl;
 				cout << "	-p,   --path		Check path" << endl;
+				cout << "	-a,   --all			Run all tests" << endl;
 				return 0;
 				break;
 			case 'a':
+				//add all your functions here- this is the "all" option
 				
+				check_sources_list();
+				return 0;
+				break;
+			case 'x':
+				check_sources_list();
 				break;
 			case 'v':
 				
@@ -68,11 +81,15 @@ int main(int argc, char* argv[]) {
 			case 'c':
 				
 				break;
-			case 'p':
-				
+			case 'p': {
+				vector<string> paths = get_paths();
+				int problems = get_path_vulnerabilities(paths);
+				cout << "PATH scan complete. " << problems << " potential issue(s) found. Issues outputted to PATH.txt\n";
 				break;
-			case '?': //apparently occurs when it gets an unknown flag? 
-				//cerr << "Error: invalid argument '" << argv[optind - 1] << "'\n";  
+			}
+			case '?': 
+				//apparently occurs when it gets an unknown flag? 
+				cerr << "Error: invalid argument '" << argv[optind - 1] << "'\n";  
 			default:
 				return 1;
 		}
