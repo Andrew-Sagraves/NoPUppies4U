@@ -1,6 +1,17 @@
-program: main.o
-        g++ -o program main.o
-main.o: main.cpp
-        g++ -c main.cpp
+program: main.o asagrave.o bmulli21.o jdong11.o
+	g++ -o program main.o asagrave.o bmulli21.o jdong11.o
+
+main.o: main.cpp asagrave.h bmulli21.h jdong11.h
+	g++ -c main.cpp
+
+asagrave.o: asagrave.cpp asagrave.h
+	g++ -c asagrave.cpp
+
+bmulli21.o: bmulli21.cpp bmulli21.h
+	g++ -c bmulli21.cpp
+
+jdong11.o: jdong11.cpp jdong11.h
+	g++ -c jdong11.cpp
+
 clean:
-        rm -f ./*.o
+	rm -f *.o program
