@@ -14,6 +14,7 @@
 
 using namespace std;
 
+
 // Checks for cron jobs in /etc/cron.d, /etc/cron.daily, /etc/cron.hourly, /etc/cron.monthly, /etc/cron.weekly
 void check_cron_jobs() {
     // First check for user permissions (requires root permission)
