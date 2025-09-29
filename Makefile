@@ -1,5 +1,5 @@
-program: main.o asagrave.o bmulli21.o jdong11.o
-	g++ -o program main.o asagrave.o bmulli21.o jdong11.o
+nopuppies4u: main.o asagrave.o bmulli21.o jdong11.o
+	g++ -o nopuppies4u main.o asagrave.o bmulli21.o jdong11.o
 
 main.o: main.cpp asagrave.h bmulli21.h jdong11.h
 	g++ -c main.cpp
