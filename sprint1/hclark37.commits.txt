@@ -1,0 +1,795 @@
+Commit: 3146bf8b27fca9ec4e532405820b10bd5bba0bb4
+Author: hclark37 <hclark37@vols.utk.edu>
+Date: 2025-09-29 09:24:01 -0400
+Message: Delete main.hpp
+
+
+diff --git a/main.hpp b/main.hpp
+deleted file mode 100644
+index bfe9c22..0000000
+--- a/main.hpp
++++ /dev/null
+@@ -1 +0,0 @@
+-int checkPath() {}
+
+Commit: 57a0e9e7f6a6c24f5a5fc847e71800c5d600de8e
+Author: hclark37 <hclark37@vols.utk.edu>
+Date: 2025-09-29 09:13:05 -0400
+Message: Update main.cpp
+fixed bug with scope
+
+diff --git a/main.cpp b/main.cpp
+index a5645d3..e7a5a38 100644
+--- a/main.cpp
++++ b/main.cpp
+@@ -63,7 +63,7 @@ int main(int argc, char* argv[]) {
+ 				return 0;
+ 				break;
+ 				
+-			case 'a':
++			case 'a': {
+ 				//add all your functions here- this is the "all" option
+ 				
+ 				check_sources_list();
+@@ -74,6 +74,7 @@ int main(int argc, char* argv[]) {
+ 			
+ 				return 0;
+ 				break;
++			}
+ 			case 'x':
+ 				check_sources_list();
+ 				break;
+
+Commit: cd3592e8967bd8f82d56a74e6232157549de46d2
+Author: hclark37 <hclark37@vols.utk.edu>
+Date: 2025-09-29 09:12:29 -0400
+Message: Update main.cpp
+added andrew's work to main's --all
+
+diff --git a/main.cpp b/main.cpp
+index 659c240..a5645d3 100644
+--- a/main.cpp
++++ b/main.cpp
+@@ -67,6 +67,11 @@ int main(int argc, char* argv[]) {
+ 				//add all your functions here- this is the "all" option
+ 				
+ 				check_sources_list();
++			
++				vector<string> paths = get_paths();
++				int problems = get_path_vulnerabilities(paths);
++				cout << "PATH scan complete. " << problems << " potential issue(s) found. Issues outputted to PATH.txt\n";
++			
+ 				return 0;
+ 				break;
+ 			case 'x':
+
+Commit: bf29ce6cc40a579f212bbb4e9b7507a994fb3f62
+Author: hclark37 <hclark37@vols.utk.edu>
+Date: 2025-09-29 09:09:26 -0400
+Message: Update main.cpp
+fixed width of the output for the --help flag of main
+
+diff --git a/main.cpp b/main.cpp
+index c29fcaa..659c240 100644
+--- a/main.cpp
++++ b/main.cpp
+@@ -8,6 +8,7 @@
+ #include "bmulli21.h"
+ #include "jdong11.h"
+ #include <vector>
++#include <iomanip>
+ 
+ using namespace std;
+ 
+@@ -51,15 +52,17 @@ int main(int argc, char* argv[]) {
+ 			case 'h':
+ 				cout << "Usage: nopuppies4u [options]" << endl;
+ 				cout << "Options:" << endl;
+-				cout << "	-h,   --help		Show this help message" << endl;
+-				cout << "	-v,   --verbose 		Enable verbose output" << endl;
+-				cout << "	-c,   --crontab		Check crontab" << endl;
+-				cout << "	-s,   --sudo		Check sudo permissions" << endl;
+-				cout << "	-x,   --sources		Check all sources" << endl;
+-				cout << "	-p,   --path		Check path" << endl;
+-				cout << "	-a,   --all			Run all tests" << endl;
++
++				cout << "  " << left << setw(25) << "-h,   --help"    << "Show this help message" << endl;
++				cout << "  " << left << setw(25) << "-v,   --verbose" << "Enable verbose output" << endl;
++				cout << "  " << left << setw(25) << "-c,   --crontab" << "Check crontab" << endl;
++				cout << "  " << left << setw(25) << "-s,   --sudo"    << "Check sudo permissions" << endl;
++				cout << "  " << left << setw(25) << "-x,   --sources" << "Check all sources" << endl;
++				cout << "  " << left << setw(25) << "-p,   --path"    << "Check path" << endl;
++				cout << "  " << left << setw(25) << "-a,   --all"     << "Run all tests" << endl;
+ 				return 0;
+ 				break;
++				
+ 			case 'a':
+ 				//add all your functions here- this is the "all" option
+ 				
+
+Commit: a030c62144923dd6aeb403c96f2657d502590843
+Author: hclark37 <hclark37@vols.utk.edu>
+Date: 2025-09-29 08:59:13 -0400
+Message: Update nopuppies4u.1
+
+
+diff --git a/man/nopuppies4u.1 b/man/nopuppies4u.1
+index c2cae38..7c0ee4b 100644
+--- a/man/nopuppies4u.1
++++ b/man/nopuppies4u.1
+@@ -1,4 +1,4 @@
+-.TH NOPUPPIES4U 1 "September 2025" "version 1.0" "User Commands"
++.TH NOPUPPIES4U
+ .SH NAME
+ nopuppies4u \- system configuration and security checks
+ .SH SYNOPSIS
+
+Commit: 1ac5bb541021ba8d028ffcccdd6f84fd2b1231a2
+Author: hclark37 <hclark37@vols.utk.edu>
+Date: 2025-09-29 08:58:58 -0400
+Message: Update nopuppies4u.1
+
+
+Commit: 0bfd5fac65cd9ba7f7a16553423d8e1cd60dd4bb
+Author: hclark37 <hclark37@vols.utk.edu>
+Date: 2025-09-29 08:50:16 -0400
+Message: Create uninstall.sh
+Uninstalls all the stuff added by install.sh
+
+diff --git a/uninstall.sh b/uninstall.sh
+new file mode 100644
+index 0000000..2bc7568
+--- /dev/null
++++ b/uninstall.sh
+@@ -0,0 +1,28 @@
++#!/bin/bash
++set -e
++
++EXEC_NAME="nopuppies4u"
++BIN_DIR="/usr/local/bin"
++MAN_DIR="/usr/local/share/man/man1"
++MAN_PAGE="nopuppies4u.1"
++
++echo "Uninstalling $EXEC_NAME..."
++
++if [ -f "$BIN_DIR/$EXEC_NAME" ]; then
++    echo "Removing $BIN_DIR/$EXEC_NAME"
++    sudo rm -f "$BIN_DIR/$EXEC_NAME"
++else
++    echo "Executable not found in $BIN_DIR"
++fi
++
++if [ -f "$MAN_DIR/$MAN_PAGE" ]; then
++    echo "Removing $MAN_DIR/$MAN_PAGE"
++    sudo rm -f "$MAN_DIR/$MAN_PAGE"
++else
++    echo "Man page not found in $MAN_DIR"
++fi
++
++echo "Updating man database..."
++sudo mandb > /dev/null
++
++echo "Uninstall complete!"
+
+Commit: 0f8b30df99795d67b71be2fee83a457e4e78cfa9
+Author: hclark37 <hclark37@vols.utk.edu>
+Date: 2025-09-29 08:46:51 -0400
+Message: Update Makefile
+
+
+diff --git a/Makefile b/Makefile
+index b29e8ef..cd94c4f 100644
+--- a/Makefile
++++ b/Makefile
+@@ -1,5 +1,5 @@
+-program: main.o asagrave.o bmulli21.o jdong11.o
+-	g++ -o program main.o asagrave.o bmulli21.o jdong11.o
++nopuppies4u: main.o asagrave.o bmulli21.o jdong11.o
++	g++ -o nopuppies4u main.o asagrave.o bmulli21.o jdong11.o
+ 
+ main.o: main.cpp asagrave.h bmulli21.h jdong11.h
+ 	g++ -c main.cpp
+
+Commit: cca89163828e2e1cc89f248d82577a52a708dda9
+Author: hclark37 <hclark37@vols.utk.edu>
+Date: 2025-09-29 08:46:20 -0400
+Message: Create nopuppies4u.1
+
+
+diff --git a/man/nopuppies4u.1 b/man/nopuppies4u.1
+new file mode 100644
+index 0000000..c2cae38
+--- /dev/null
++++ b/man/nopuppies4u.1
+@@ -0,0 +1,52 @@
++.TH NOPUPPIES4U 1 "September 2025" "version 1.0" "User Commands"
++.SH NAME
++nopuppies4u \- system configuration and security checks
++.SH SYNOPSIS
++.B nopuppies4u
++[\fIOPTIONS\fR]
++.SH DESCRIPTION
++\fBnopuppies4u\fR is a command-line tool for performing basic system checks related to
++environment configuration and potential misconfigurations. It can scan the user's
++\fBPATH\fR, check \fBcrontab\fR entries, test \fBsudo\fR permissions, and
++inspect Ubuntu's sources. It can run individual checks or all checks at once.
++
++.SH OPTIONS
++.TP
++.BR -h ", " --help
++Display a help message.
++
++.TP
++.BR -v ", " --verbose
++Enable verbose output.
++
++.TP
++.BR -c ", " --crontab
++Check the system's crontab entries.
++
++.TP
++.BR -s ", " --sudo
++Check sudo permissions.
++
++.TP
++.BR -p ", " --path
++Check the system's PATH for potential vulnerabilities.
++Results are written to \fBPATH.txt\fR.
++
++.TP
++.BR -x ", " --sources
++Check Ubuntu software sources.
++
++.TP
++.BR -a ", " --all
++Run all available checks.
++
++.SH EXAMPLES
++Run a PATH check:
++.RS
++nopuppies4u --path
++.RE
++
++Run all checks:
++.RS
++nopuppies4u --all
++.RE
+
+Commit: b09293cb0c227961a82edaa747ad44f171bbc52f
+Author: hclark37 <hclark37@vols.utk.edu>
+Date: 2025-09-29 08:45:36 -0400
+Message: add install.sh
+Adds man page, installs program to path
+
+diff --git a/install.sh b/install.sh
+new file mode 100644
+index 0000000..f29b2b8
+--- /dev/null
++++ b/install.sh
+@@ -0,0 +1,27 @@
++#!/bin/bash
++
++set -e
++
++EXEC_NAME="nopuppies4u"
++BIN_DIR="/usr/local/bin"
++MAN_DIR="/usr/local/share/man/man1"
++MAN_PAGE="nopuppies4u.1"
++
++echo "Building project..."
++make
++
++echo "Installing executable to $BIN_DIR..."
++sudo cp "$EXEC_NAME" "$BIN_DIR/"
++sudo chmod 755 "$BIN_DIR/$EXEC_NAME"
++
++echo "Installing man page to $MAN_DIR..."
++sudo mkdir -p "$MAN_DIR"
++sudo cp "man/$MAN_PAGE" "$MAN_DIR/"
++sudo chmod 644 "$MAN_DIR/$MAN_PAGE"
++
++echo "Updating man database..."
++sudo mandb >/dev/null 2>&1 || true
++
++echo "Installation complete!"
++echo "You can now run '$EXEC_NAME' from anywhere, and see the man page with 'man $EXEC_NAME'."
++
+
+Commit: a121caec854c01f46b417fbbe8d8b85b417f3f3f
+Author: hclark37 <hclark37@vols.utk.edu>
+Date: 2025-09-26 17:58:29 -0400
+Message: Update Makefile
+
+
+diff --git a/Makefile b/Makefile
+index fa5656d..b29e8ef 100644
+--- a/Makefile
++++ b/Makefile
+@@ -1,6 +1,17 @@
+-program: main.o
+-        g++ -o program main.o
+-main.o: main.cpp
+-        g++ -c main.cpp
++program: main.o asagrave.o bmulli21.o jdong11.o
++	g++ -o program main.o asagrave.o bmulli21.o jdong11.o
++
++main.o: main.cpp asagrave.h bmulli21.h jdong11.h
++	g++ -c main.cpp
++
++asagrave.o: asagrave.cpp asagrave.h
++	g++ -c asagrave.cpp
++
++bmulli21.o: bmulli21.cpp bmulli21.h
++	g++ -c bmulli21.cpp
++
++jdong11.o: jdong11.cpp jdong11.h
++	g++ -c jdong11.cpp
++
+ clean:
+-        rm -f ./*.o
++	rm -f *.o program
+
+Commit: 8dae9d7c486d445bfe0a722d87f76da25dffb565
+Author: hclark37 <hclark37@vols.utk.edu>
+Date: 2025-09-26 17:55:33 -0400
+Message: Update main.cpp
+Included functionality to call other people's functions. Added more flags.
+
+diff --git a/main.cpp b/main.cpp
+index b6c8369..c29fcaa 100644
+--- a/main.cpp
++++ b/main.cpp
+@@ -4,8 +4,10 @@
+ //#include "main.hpp"
+ //#include "asagrave.h"
+ #include <getopt.h> 
++#include "asagrave.h"
++#include "bmulli21.h"
+ #include "jdong11.h"
+-
++#include <vector>
+ 
+ using namespace std;
+ 
+@@ -29,6 +31,7 @@ int main(int argc, char* argv[]) {
+ 		{"crontab", no_argument,	0, 'c'},
+ 		{"sudo", no_argument,		0, 's'},
+ 		{"path", no_argument,		0, 'p'},
++		{"sources", no_argument,	0, 'x'},
+ 		{"all", no_argument,		0, 'a'},
+ 		{0, 0, 0, 0}
+ 	};
+@@ -36,12 +39,14 @@ int main(int argc, char* argv[]) {
+ 	int opt = 0;
+ 	int options_index = 0;
+ 	
+-	if (optind == 1) {
++	if (argc == 1) {
+ 		cout << "Usage: nopuppies4u [options]" << endl;
+ 		return 0;
+ 	}
+ 	
+-	while ((opt = getopt_long(argc, argv, "hvscp", long_options, &options_index)) != -1) { //hvscp lets short options work, like -s
++	while ((opt = getopt_long(argc, argv, "hvscpxa", long_options, &options_index)) != -1) { //hvscp lets short options work, like -s
++		//you have to make sure to add any additional options to that ""
++		
+ 		switch (opt) {
+ 			case 'h':
+ 				cout << "Usage: nopuppies4u [options]" << endl;
+@@ -50,11 +55,19 @@ int main(int argc, char* argv[]) {
+ 				cout << "	-v,   --verbose 		Enable verbose output" << endl;
+ 				cout << "	-c,   --crontab		Check crontab" << endl;
+ 				cout << "	-s,   --sudo		Check sudo permissions" << endl;
++				cout << "	-x,   --sources		Check all sources" << endl;
+ 				cout << "	-p,   --path		Check path" << endl;
++				cout << "	-a,   --all			Run all tests" << endl;
+ 				return 0;
+ 				break;
+ 			case 'a':
++				//add all your functions here- this is the "all" option
+ 				
++				check_sources_list();
++				return 0;
++				break;
++			case 'x':
++				check_sources_list();
+ 				break;
+ 			case 'v':
+ 				
+@@ -68,11 +81,15 @@ int main(int argc, char* argv[]) {
+ 			case 'c':
+ 				
+ 				break;
+-			case 'p':
+-				
++			case 'p': {
++				vector<string> paths = get_paths();
++				int problems = get_path_vulnerabilities(paths);
++				cout << "PATH scan complete. " << problems << " potential issue(s) found. Issues outputted to PATH.txt\n";
+ 				break;
+-			case '?': //apparently occurs when it gets an unknown flag? 
+-				//cerr << "Error: invalid argument '" << argv[optind - 1] << "'\n";  
++			}
++			case '?': 
++				//apparently occurs when it gets an unknown flag? 
++				cerr << "Error: invalid argument '" << argv[optind - 1] << "'\n";  
+ 			default:
+ 				return 1;
+ 		}
+
+Commit: 2a57cd074ad65c42b6a2a315637d04a8efeb8136
+Author: hclark37 <hclark37@vols.utk.edu>
+Date: 2025-09-23 07:55:00 -0500
+Message: Update main.cpp
+
+
+diff --git a/main.cpp b/main.cpp
+index f01f1e6..b6c8369 100644
+--- a/main.cpp
++++ b/main.cpp
+@@ -4,6 +4,8 @@
+ //#include "main.hpp"
+ //#include "asagrave.h"
+ #include <getopt.h> 
++#include "jdong11.h"
++
+ 
+ using namespace std;
+ 
+@@ -27,14 +29,19 @@ int main(int argc, char* argv[]) {
+ 		{"crontab", no_argument,	0, 'c'},
+ 		{"sudo", no_argument,		0, 's'},
+ 		{"path", no_argument,		0, 'p'},
+-
++		{"all", no_argument,		0, 'a'},
+ 		{0, 0, 0, 0}
+ 	};
+ 	
+ 	int opt = 0;
+ 	int options_index = 0;
+ 	
+-	while ((opt = getopt_long(argc, argv, "", long_options, &options_index)) != -1) {
++	if (optind == 1) {
++		cout << "Usage: nopuppies4u [options]" << endl;
++		return 0;
++	}
++	
++	while ((opt = getopt_long(argc, argv, "hvscp", long_options, &options_index)) != -1) { //hvscp lets short options work, like -s
+ 		switch (opt) {
+ 			case 'h':
+ 				cout << "Usage: nopuppies4u [options]" << endl;
+@@ -45,9 +52,12 @@ int main(int argc, char* argv[]) {
+ 				cout << "	-s,   --sudo		Check sudo permissions" << endl;
+ 				cout << "	-p,   --path		Check path" << endl;
+ 				return 0;
++				break;
++			case 'a':
++				
+ 				break;
+ 			case 'v':
+-			
++				
+ 				break;
+ 			case 'o':
+ 				
+@@ -59,10 +69,10 @@ int main(int argc, char* argv[]) {
+ 				
+ 				break;
+ 			case 'p':
+-			
++				
+ 				break;
+ 			case '?': //apparently occurs when it gets an unknown flag? 
+-				cerr << "Error: invalid argument '" << argv[optind - 1] << "'\n";  
++				//cerr << "Error: invalid argument '" << argv[optind - 1] << "'\n";  
+ 			default:
+ 				return 1;
+ 		}
+
+Commit: 26c23adbfa24447e4eaff1f41520e6f45c64ce92
+Author: hclark37 <hclark37@vols.utk.edu>
+Date: 2025-09-23 07:52:37 -0500
+Message: Create Makefile
+
+
+diff --git a/Makefile b/Makefile
+new file mode 100644
+index 0000000..fa5656d
+--- /dev/null
++++ b/Makefile
+@@ -0,0 +1,6 @@
++program: main.o
++        g++ -o program main.o
++main.o: main.cpp
++        g++ -c main.cpp
++clean:
++        rm -f ./*.o
+
+Commit: f0a75a814d31b8c7131ba165c9010cb63088c1a7
+Author: hclark37 <hclark37@vols.utk.edu>
+Date: 2025-09-23 07:35:02 -0500
+Message: Update main.cpp
+Fixed my code
+
+diff --git a/main.cpp b/main.cpp
+index 9fa44dd..f01f1e6 100644
+--- a/main.cpp
++++ b/main.cpp
+@@ -1,13 +1,13 @@
+ #include <iostream>
+ #include <string.h>
+ #include <stdio.h>
+-#include "main.hpp"
+-#include "asagrave.h"
++//#include "main.hpp"
++//#include "asagrave.h"
+ #include <getopt.h> 
+ 
+ using namespace std;
+ 
+-int main(int argc, **char argv) {
++int main(int argc, char* argv[]) {
+ 	
+ 	/*
+ 		- Check to see if argv[i] is a valid --(command)
+@@ -34,7 +34,7 @@ int main(int argc, **char argv) {
+ 	int opt = 0;
+ 	int options_index = 0;
+ 	
+-	while ((opt = getopt_long(argc, argv, "", long_options, &option_index)) != -1) {
++	while ((opt = getopt_long(argc, argv, "", long_options, &options_index)) != -1) {
+ 		switch (opt) {
+ 			case 'h':
+ 				cout << "Usage: nopuppies4u [options]" << endl;
+@@ -66,15 +66,7 @@ int main(int argc, **char argv) {
+ 			default:
+ 				return 1;
+ 		}
+-		if (help == true) {
+-			break;
+-		}
+ 	}
+ 	
+-	if (help) {
+-		
+-	}
+-	
+-	
+ 	return 0;
+ }
+
+Commit: 79ced8ce558c14e849072826484fcf4c975c9ba0
+Author: hclark37 <hclark37@vols.utk.edu>
+Date: 2025-09-22 14:19:52 -0500
+Message: Update main.cpp
+Committing first progress in my ability to take input
+
+diff --git a/main.cpp b/main.cpp
+index 7998558..9fa44dd 100644
+--- a/main.cpp
++++ b/main.cpp
+@@ -1,12 +1,80 @@
+ #include <iostream>
++#include <string.h>
++#include <stdio.h>
+ #include "main.hpp"
+ #include "asagrave.h"
++#include <getopt.h> 
++
+ using namespace std;
+ 
+ int main(int argc, **char argv) {
++	
++	/*
++		- Check to see if argv[i] is a valid --(command)
++		- If (command) requires input, check argv[i + 1] for valid input. If so, increment i to skip it for next, and process it, otherwise, error? 
++		- Goal: have it always either work or fail. No unexpected states 
++		
++		-p for path
++		-c for crontab
++		-s for sudo
++		-a for all?
++		-v 
++	*/
++	
++	static struct option long_options[] = {
++		{"help", no_argument,		0, 'h'},
++		{"verbose", no_argument,	0, 'v'},
++		{"crontab", no_argument,	0, 'c'},
++		{"sudo", no_argument,		0, 's'},
++		{"path", no_argument,		0, 'p'},
+ 
+-  for (int i = 0; i < argc; i++) {
+-      
+-  }
+-
++		{0, 0, 0, 0}
++	};
++	
++	int opt = 0;
++	int options_index = 0;
++	
++	while ((opt = getopt_long(argc, argv, "", long_options, &option_index)) != -1) {
++		switch (opt) {
++			case 'h':
++				cout << "Usage: nopuppies4u [options]" << endl;
++				cout << "Options:" << endl;
++				cout << "	-h,   --help		Show this help message" << endl;
++				cout << "	-v,   --verbose 		Enable verbose output" << endl;
++				cout << "	-c,   --crontab		Check crontab" << endl;
++				cout << "	-s,   --sudo		Check sudo permissions" << endl;
++				cout << "	-p,   --path		Check path" << endl;
++				return 0;
++				break;
++			case 'v':
++			
++				break;
++			case 'o':
++				
++				break;
++			case 's':
++				
++				break;
++			case 'c':
++				
++				break;
++			case 'p':
++			
++				break;
++			case '?': //apparently occurs when it gets an unknown flag? 
++				cerr << "Error: invalid argument '" << argv[optind - 1] << "'\n";  
++			default:
++				return 1;
++		}
++		if (help == true) {
++			break;
++		}
++	}
++	
++	if (help) {
++		
++	}
++	
++	
++	return 0;
+ }
+
+Commit: f5bb4e7f386e833a507167e1312e0f018793c01c
+Author: hclark37 <hclark37@vols.utk.edu>
+Date: 2025-09-16 07:54:40 -0500
+Message: Add files via upload
+
+
+diff --git a/helloplus/hclark37/Screenshot from 2025-09-16 08-24-03.png b/helloplus/hclark37/Screenshot from 2025-09-16 08-24-03.png
+new file mode 100644
+index 0000000..9b26a11
+Binary files /dev/null and b/helloplus/hclark37/Screenshot from 2025-09-16 08-24-03.png differ
+
+Commit: 2ba39c4386804029ed85e377bd94b275cee76f5c
+Author: hclark37 <hclark37@vols.utk.edu>
+Date: 2025-09-16 07:54:11 -0500
+Message: Update README.md
+
+
+diff --git a/helloplus/hclark37/README.md b/helloplus/hclark37/README.md
+index 58af2cc..c45e45e 100644
+--- a/helloplus/hclark37/README.md
++++ b/helloplus/hclark37/README.md
+@@ -1,4 +1,4 @@
+-#User Password Tester
++# User Password Tester
+ Harrison Clark
+ 
+ This program tests to ese whether users have a password or not, and especially whether or not they have a password and are root. This technology will be incredibly important for our security testing because it allows us to check whether or not an attacker could access a root user account and use it for maliciousness. It tests this by using a variety of different includes to check these files, including in particular <pwd.h>. To run it, just run: 
+
+Commit: 1bc202491745d41767567617ddfb93a0daed605a
+Author: hclark37 <hclark37@vols.utk.edu>
+Date: 2025-09-16 07:53:42 -0500
+Message: Create README.md
+
+
+diff --git a/helloplus/hclark37/README.md b/helloplus/hclark37/README.md
+new file mode 100644
+index 0000000..58af2cc
+--- /dev/null
++++ b/helloplus/hclark37/README.md
+@@ -0,0 +1,7 @@
++#User Password Tester
++Harrison Clark
++
++This program tests to ese whether users have a password or not, and especially whether or not they have a password and are root. This technology will be incredibly important for our security testing because it allows us to check whether or not an attacker could access a root user account and use it for maliciousness. It tests this by using a variety of different includes to check these files, including in particular <pwd.h>. To run it, just run: 
++
++g++ hclark37.cpp
++./a.out
+
+Commit: 445adf80536d77f58a47a153f7a4bbcf6dbc3b3b
+Author: hclark37 <hclark37@vols.utk.edu>
+Date: 2025-09-16 07:48:36 -0500
+Message: Update hclark37.cpp
+
+
+diff --git a/helloplus/hclark37/hclark37.cpp b/helloplus/hclark37/hclark37.cpp
+index 8b13789..6a26b93 100644
+--- a/helloplus/hclark37/hclark37.cpp
++++ b/helloplus/hclark37/hclark37.cpp
+@@ -1 +1,66 @@
++#include <iostream>
++//lets you read /etc/passwd 
++#include <pwd.h>
++//reads /etc/shadow which is like the encrypted password file 
++#include <shadow.h>
++#include <cstring> 
++//for geteuid()
++#include <unistd.h>
+ 
++
++using namespace std;
++
++int main() {
++	//root execution check for /etc/shadow 
++	if (geteuid() != 0) {
++		cerr << "Error: This program must be run as root." << endl;
++		return 1;
++	}
++	
++	setpwent();  //starts reading at start of the password database 
++	
++	struct passwd *pw;
++	/*
++	char *pw_name: The user's login name.
++	uid_t pw_uid: The numerical user ID (UID).
++	gid_t pw_gid: The numerical group ID (GID) of the user's primary group.
++	char *pw_dir: The path to the user's home directory.
++	char *pw_shell: The path to the user's default login shell.
++	*/
++	
++	bool fail_switch = false;
++	int total_checked = 0;
++	
++	while ((pw = getpwent()) != nullptr) {
++		//skips accounts like "daemon" which arent 0 and are less than 1000, which arent real logins
++		if (pw->pw_uid < 1000 && pw->pw_uid != 0) {
++			continue; 
++		}
++		//iterate the counter
++		total_checked += 1;
++		
++		struct spwd *sp = getspnam(pw->pw_name);
++		
++		/*
++		https://man7.org/linux/man-pages/man3/getspnam.3.html
++		returns a pointer to a structure
++		containing the broken-out fields of the record in the shadow
++		password database that matches the username name.
++		*/
++		if (sp && sp->sp_pwdp && strlen(sp->sp_pwdp) == 0) {
++			fail_switch = true;
++			cout << pw->pw_name << " has no password!" << endl;
++			if (pw->pw_uid == 0) {
++				cout << "Warning: this user has ROOT permissions (UID 0)!" << endl;
++			}
++		}
++	}
++	if (fail_switch == false) {
++		cout << "No users found without passwords." << endl;
++	}
++	cout << "Total users checked: " << total_checked << endl;
++	
++	endpwent();
++	
++	return 0;
++}
+
+Commit: 61ac7eac5d0cb80c0f9550978b1ed0ac0b6a4f20
+Author: hclark37 <hclark37@vols.utk.edu>
+Date: 2025-09-16 07:32:49 -0500
+Message: Create hclark37.cpp
+
+
+diff --git a/helloplus/hclark37/hclark37.cpp b/helloplus/hclark37/hclark37.cpp
+new file mode 100644
+index 0000000..8b13789
+--- /dev/null
++++ b/helloplus/hclark37/hclark37.cpp
+@@ -0,0 +1 @@
++
