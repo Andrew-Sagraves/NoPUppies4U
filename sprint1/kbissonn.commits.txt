@@ -1,0 +1,248 @@
+kbissonn.cpp:
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400   1) #include "kbissonn.h"
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400   2) #include <iostream>
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400   3) #include <fstream>
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400   4) #include <unistd.h>
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400   5) #include <stdlib.h>
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400   6) #include <vector>
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400   7) #include <sstream>
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400   8) #include <filesystem>
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400   9) #include <regex>
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  10) #include <set>
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  11) #include <sys/types.h>
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  12) #include <sys/stat.h>
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  13) #include <functional>
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  14) 
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  15) using namespace std;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  16) 
+e0046d9d (kaden-bissonnette 2025-09-29 12:46:51 -0400  17) 
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  18) // Checks for cron jobs in /etc/cron.d, /etc/cron.daily, /etc/cron.hourly, /etc/cron.monthly, /etc/cron.weekly
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  19) void check_cron_jobs() {
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  20)     // First check for user permissions (requires root permission)
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  21)     if (geteuid() != 0) {
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  22)         cerr << "You need \"root\" permission to check cron jobs. (Run program as sudo)" << endl;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  23)         return;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  24)     }
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  25)     // Directories to check for cron jobs
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  26)     vector<string> cron_dirs = {
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  27)         "/etc/cron.d",
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  28)         "/etc/cron.daily",
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  29)         "/etc/cron.hourly",
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  30)         "/etc/cron.monthly",
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  31)         "/etc/cron.weekly",
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  32)         "/var/spool/cron",
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  33)         "/var/spool/cron/crontabs"
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  34)     };
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  35) 
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  36)     set<string> checked_files;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  37) 
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  38)     // Process /etc/crontab if present
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  39)     filesystem::path etccrontab = "/etc/crontab";
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  40)     if (filesystem::exists(etccrontab)) process_file(etccrontab, checked_files);
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  41) 
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  42)     // Go through and process each file from the cron directories
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  43)     for (const string &dir : cron_dirs) {
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  44)         try {
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  45)             if (!filesystem::exists(dir)) continue;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  46)             for (const filesystem::directory_entry &entry : filesystem::directory_iterator(dir)) {
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  47)                 process_file(entry.path(), checked_files);
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  48)             }
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  49)         } catch (const filesystem::filesystem_error &e) {
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  50)             cerr << "Error reading " << dir << ": " << e.what() << endl;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  51)         }
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  52)     }
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  53) 
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  54)     cout << "Cron job scan complete. Checked " << checked_files.size() << " distinct path(s)." << endl;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  55) }
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  56) 
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  57) // Helper functions
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  58) // Go through and see if it is a schedule token (5 * * * *, @reboot, etc)
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  59) bool is_schedule_token(const string &t) {
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  60)     static regex r("^[0-9\\*\\/,\\-]+$");
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  61)     if (t.empty()) return false;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  62)     if (t.front() == '@') return true;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  63)     return regex_match(t, r);
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  64) }
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  65) 
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  66) // Split a string into tokens, preserving quoted substrings
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  67) vector<string> split_tokens(const string &s) {
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  68)     vector<string> out;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  69)     string cur;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  70)     bool in_squote = false;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  71)     bool in_dquote = false;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  72)     for (size_t i = 0; i < s.size(); ++i) {
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  73)         char c = s[i];
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  74)         if (c == '\'' && !in_dquote) {
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  75)             in_squote = !in_squote;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  76)             cur.push_back(c);
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  77)             continue;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  78)         }
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  79)         if (c == '"' && !in_squote) {
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  80)             in_dquote = !in_dquote;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  81)             cur.push_back(c);
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  82)             continue;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  83)         }
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  84)         if (isspace((unsigned char)c) && !in_squote && !in_dquote) {
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  85)             if (!cur.empty()) { out.push_back(cur); cur.clear(); }
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  86)         } else {
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  87)             cur.push_back(c);
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  88)         }
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  89)     }
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  90)     if (!cur.empty()) out.push_back(cur);
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  91)     return out;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  92) }
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  93) 
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  94) // Removing extra quotes and special chars
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  95) string sanitize_token(string t) {
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  96)     if (t.size() >= 2 && ((t.front() == '"' && t.back() == '"') || (t.front() == '\'' && t.back() == '\''))) {
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  97)         t = t.substr(1, t.size() - 2);
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  98)     }
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  99)     while (!t.empty() && (t.back()=='|' || t.back()=='&' || t.back()=='>' || t.back()=='<' || t.back()==';' || t.back()==')')) t.pop_back();
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 100)     while (!t.empty() && (t.front()=='(')) t.erase(t.begin());
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 101)     return t;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 102) }
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 103) 
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 104) // Get everthring that looks like a path from a command string
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 105) vector<string> extract_paths(const string &cmd) {
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 106)     vector<string> found;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 107)     vector<string> tokens = split_tokens(cmd);
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 108)     for (const string &tk : tokens) {
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 109)         string s = sanitize_token(tk);
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 110)         if (s.empty()) continue;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 111)         if (s.find('=') != string::npos && s.find('/') == string::npos) continue;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 112)         if (s.find('/') != string::npos) {
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 113)             size_t pos = s.find('>');
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 114)             if (pos != string::npos && pos == 0) continue;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 115)             found.push_back(s);
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 116)         }
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 117)     }
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 118)     return found;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 119) }
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 120) 
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 121) // Look line by line through a file and get commands/paths, currently prints
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 122) // files to the console with their writability status
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 123) void process_file(const filesystem::path &p, set<string> &checked_files) {
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 124)     if (!filesystem::is_regular_file(p)) return;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 125)     ifstream f(p);
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 126)     if (!f) return;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 127)     string line;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 128)     int linenumber = 0;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 129)     while (getline(f, line)) {
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 130)         ++linenumber;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 131)         size_t start = line.find_first_not_of(" \t");
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 132)         if (start == string::npos) continue;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 133)         string sline = line.substr(start);
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 134)         if (sline.empty() || sline[0] == '#') continue;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 135)         size_t eq = sline.find('=');
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 136)         if (eq != string::npos && sline.find(' ') == string::npos) continue;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 137) 
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 138)         vector<string> tokens = split_tokens(sline);
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 139)         size_t idx = 0;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 140)         while (idx < tokens.size() && is_schedule_token(tokens[idx])) ++idx;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 141)         if (idx < tokens.size() && tokens.size() > 1) {
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 142)             string tk = tokens[idx];
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 143)             if (tk.find('/') == string::npos && tk.find('=') == string::npos && !is_schedule_token(tk)) {
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 144)                 ++idx;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 145)             }
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 146)         }
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 147)         string cmd;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 148)         for (size_t i = idx; i < tokens.size(); ++i) {
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 149)             if (!cmd.empty()) cmd.push_back(' ');
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 150)             cmd += tokens[i];
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 151)         }
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 152)         if (cmd.empty()) continue;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 153)         vector<string> paths = extract_paths(cmd);
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 154)         for (const string &pth : paths) {
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 155)             string candidate = pth;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 156)             try {
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 157)                 if (!candidate.empty() && candidate[0] == '/') {
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 158)                     filesystem::path fp = candidate;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 159)                     string resolved = fp.lexically_normal().string();
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 160)                     candidate = resolved;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 161)                 }
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 162)             } catch (...) {}
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 163) 
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 164)             if (checked_files.count(candidate)) continue;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 165)             checked_files.insert(candidate);
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 166) 
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 167)             cout << p << ":" << linenumber << " -> referencing: " << candidate;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 168)             if (filesystem::exists(candidate)) {
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 169)                 bool writable = (access(candidate.c_str(), W_OK) == 0);
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 170)                 cout << " (exists) ";
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 171)                 if (writable) cout << "[WRITABLE]";
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 172)                 else cout << "[not writable]";
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 173)                 cout << endl;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 174)             } else {
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 175)                 cout << " (missing)" << endl;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 176)             }
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 177)         }
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 178)     }
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 179) }
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 180) 
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 181) // Verbose option to list all called files
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 182) void list_cronjob_commands() {
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 183)     vector<string> cron_dirs = {
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 184)         "/etc/cron.d",
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 185)         "/etc/cron.daily",
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 186)         "/etc/cron.hourly",
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 187)         "/etc/cron.monthly",
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 188)         "/etc/cron.weekly"
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 189)     };
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 190) 
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 191)     for (const string &dir : cron_dirs) {
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 192)         cout << "Checking directory: " << dir << endl;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 193)         for (const filesystem::directory_entry &entry : filesystem::directory_iterator(dir)) {
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 194)             if (entry.is_regular_file()) {
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 195)                 ifstream cronfile(entry.path());
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 196)                 string line;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 197)                 cout << "File: " << entry.path() << endl;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 198)                 while (getline(cronfile, line)) {
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 199)                     // Skip comments and empty lines
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 200)                     if (line.empty() || line[0] == '#') continue;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 201)                     stringstream ss(line);
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 202)                     string field, command;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 203)                     int field_count = 0;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 204)                     // Skip schedule fields (usually 5 for crontab, sometimes 6+ for /etc/cron.d)
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 205)                     while (ss >> field && field_count < 5) {
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 206)                         field_count++;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 207)                     }
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 208)                     // The rest is the command
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 209)                     getline(ss, command);
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 210)                     if (!command.empty()) {
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 211)                         cout << "  Command: " << command << endl;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 212)                     }
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 213)                 }
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 214)             }
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 215)         }
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 216)     }
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 217) }
+
+
+kbissonn.h:
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  1) #ifndef KBISSONN_H
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  2) #define KBISSONN_H
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  3) 
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  4) using namespace std;
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  5) 
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  6) #include <string>
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  7) #include <vector>
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  8) #include <filesystem>
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400  9) #include <set>
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 10) 
+e0046d9d (kaden-bissonnette 2025-09-29 12:46:51 -0400 11) 
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 12) //helper functions for check_cron_jobs()
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 13) bool is_schedule_token(const string &t);
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 14) vector<string> split_tokens(const string &s);
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 15) string sanitize_token(string t);
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 16) vector<string> extract_paths(const string &cmd);
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 17) void process_file(const filesystem::path &p, set<string> &checked_files);
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 18) 
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 19) void check_cron_jobs();
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 20) 
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 21) // For verbose
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 22) void list_cronjob_commands();
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 23) 
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 24) 
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 25) //void check_sudoers();
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 26) 
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 27) #endif
