@@ -63,7 +63,7 @@ int main(int argc, char* argv[]) {
 				return 0;
 				break;
 				
-			case 'a':
+			case 'a': {
 				//add all your functions here- this is the "all" option
 				
 				check_sources_list();
@@ -74,6 +74,7 @@ int main(int argc, char* argv[]) {
 			
 				return 0;
 				break;
+			}
 			case 'x':
 				check_sources_list();
 				break;
