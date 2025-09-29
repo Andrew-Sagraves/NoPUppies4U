@@ -1,0 +1,52 @@
+.TH NOPUPPIES4U 1 "September 2025" "version 1.0" "User Commands"
+.SH NAME
+nopuppies4u \- system configuration and security checks
+.SH SYNOPSIS
+.B nopuppies4u
+[\fIOPTIONS\fR]
+.SH DESCRIPTION
+\fBnopuppies4u\fR is a command-line tool for performing basic system checks related to
+environment configuration and potential misconfigurations. It can scan the user's
+\fBPATH\fR, check \fBcrontab\fR entries, test \fBsudo\fR permissions, and
+inspect Ubuntu's sources. It can run individual checks or all checks at once.
+
+.SH OPTIONS
+.TP
+.BR -h ", " --help
+Display a help message.
+
+.TP
+.BR -v ", " --verbose
+Enable verbose output.
+
+.TP
+.BR -c ", " --crontab
+Check the system's crontab entries.
+
+.TP
+.BR -s ", " --sudo
+Check sudo permissions.
+
+.TP
+.BR -p ", " --path
+Check the system's PATH for potential vulnerabilities.
+Results are written to \fBPATH.txt\fR.
+
+.TP
+.BR -x ", " --sources
+Check Ubuntu software sources.
+
+.TP
+.BR -a ", " --all
+Run all available checks.
+
+.SH EXAMPLES
+Run a PATH check:
+.RS
+nopuppies4u --path
+.RE
+
+Run all checks:
+.RS
+nopuppies4u --all
+.RE
