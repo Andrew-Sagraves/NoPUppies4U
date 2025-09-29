@@ -1,25 +1,18 @@
 #ifndef BMULLI21_H
 #define BMULLI21_H
 
-#include <vector>
 #include <string>
+#include <vector>
+#include <map>
+#include <ctime>
 
 using namespace std;
 
-//Functions have been made void to avoid conflicts with other files
-
-//Returns true if a file has been modified since the last check
-//bool check_date_modified(string filename);
-void check_date_modified(string filename);
-//Creates a file with all the files that have been modified since the last check
-void create_file(vector<string> files); 
-//Creates a vector of all files in a directory
-//vector<string> create_vector(string directory);
-void create_vector(string directory);
-//Checks if any files in a directory have been modified since the last check
-void check_directory(vector<string> files);
-//Recursively checks a directory and subdirectories for modified files
-void check_all_directories(string directory);
-
+//Loads original date modified times from a file for comparison into a map
+map<string, time_t> load_previous_date_modified(const string& dateModifiedFile);
+//Recursively finds and stores all files in a directory and subdirectories in a vector
+vector<string> get_all_files_recursively(const string& directoryPath);
+//All in one function to create a date modified file and check against that file on subsequent runs
+void check_directory_for_changes(const string& checkingDirectory);
 
 #endif
