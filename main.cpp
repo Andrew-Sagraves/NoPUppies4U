@@ -67,6 +67,11 @@ int main(int argc, char* argv[]) {
 				//add all your functions here- this is the "all" option
 				
 				check_sources_list();
+			
+				vector<string> paths = get_paths();
+				int problems = get_path_vulnerabilities(paths);
+				cout << "PATH scan complete. " << problems << " potential issue(s) found. Issues outputted to PATH.txt\n";
+			
 				return 0;
 				break;
 			case 'x':
