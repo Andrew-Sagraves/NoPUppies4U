@@ -8,6 +8,7 @@
 #include "bmulli21.h"
 #include "jdong11.h"
 #include <vector>
+#include <iomanip>
 
 using namespace std;
 
@@ -51,15 +52,17 @@ int main(int argc, char* argv[]) {
 			case 'h':
 				cout << "Usage: nopuppies4u [options]" << endl;
 				cout << "Options:" << endl;
-				cout << "	-h,   --help		Show this help message" << endl;
-				cout << "	-v,   --verbose 		Enable verbose output" << endl;
-				cout << "	-c,   --crontab		Check crontab" << endl;
-				cout << "	-s,   --sudo		Check sudo permissions" << endl;
-				cout << "	-x,   --sources		Check all sources" << endl;
-				cout << "	-p,   --path		Check path" << endl;
-				cout << "	-a,   --all			Run all tests" << endl;
+
+				cout << "  " << left << setw(25) << "-h,   --help"    << "Show this help message" << endl;
+				cout << "  " << left << setw(25) << "-v,   --verbose" << "Enable verbose output" << endl;
+				cout << "  " << left << setw(25) << "-c,   --crontab" << "Check crontab" << endl;
+				cout << "  " << left << setw(25) << "-s,   --sudo"    << "Check sudo permissions" << endl;
+				cout << "  " << left << setw(25) << "-x,   --sources" << "Check all sources" << endl;
+				cout << "  " << left << setw(25) << "-p,   --path"    << "Check path" << endl;
+				cout << "  " << left << setw(25) << "-a,   --all"     << "Run all tests" << endl;
 				return 0;
 				break;
+				
 			case 'a':
 				//add all your functions here- this is the "all" option
 				
