@@ -1,0 +1,173 @@
+cb374c99 (asagrave        2025-09-23 08:56:20 -0400  1) #ifndef ASAGRAVE_H
+1f6cd5b8 (asagrave        2025-09-25 08:22:11 -0400  2) #define ASAGRAVE_H
+1f6cd5b8 (asagrave        2025-09-25 08:22:11 -0400  4) #include <string>
+cb374c99 (asagrave        2025-09-23 08:56:20 -0400  5) #include <vector>
+8c97c913 (asagrave        2025-09-25 08:50:16 -0400  6) #include <unordered_map>
+cb374c99 (asagrave        2025-09-23 08:56:20 -0400  7) 
+1f6cd5b8 (asagrave        2025-09-25 08:22:11 -0400  8) // Retrieve the $PATH entries as a vector of strings
+cb374c99 (asagrave        2025-09-23 08:56:20 -0400  9) std::vector<std::string> get_paths();
+cb374c99 (asagrave        2025-09-23 08:56:20 -0400 10) 
+1f6cd5b8 (asagrave        2025-09-25 08:22:11 -0400 11) // Check if a directory (and its parents) are world-writable
+1f6cd5b8 (asagrave        2025-09-25 08:22:11 -0400 12) bool pathutil_is_world_writable_dir(const std::string& dir);
+cb374c99 (asagrave        2025-09-23 08:56:20 -0400 13) 
+8c97c913 (asagrave        2025-09-25 08:50:16 -0400 14) // Check if directory string is relative (".", empty, or not starting with '/')
+1f6cd5b8 (asagrave        2025-09-25 08:22:11 -0400 15) bool pathutil_is_relative_dir(const std::string& dir);
+cb374c99 (asagrave        2025-09-23 08:56:20 -0400 16) 
+fbd494b5 (asagrave        2025-09-25 08:37:20 -0400 17) // Struct to hold vulnerability result
+fbd494b5 (asagrave        2025-09-25 08:37:20 -0400 18) struct PathVulnResult {
+fbd494b5 (asagrave        2025-09-25 08:37:20 -0400 19)     bool vulnerable;
+fbd494b5 (asagrave        2025-09-25 08:37:20 -0400 20)     std::string reason;
+fbd494b5 (asagrave        2025-09-25 08:37:20 -0400 21) };
+fbd494b5 (asagrave        2025-09-25 08:37:20 -0400 22) 
+8c97c913 (asagrave        2025-09-25 08:50:16 -0400 23) // Check if a specific directory has a vulnerability (directory or files)
+fbd494b5 (asagrave        2025-09-25 08:37:20 -0400 24) PathVulnResult pathutil_dir_has_vulnerability(const std::string& dir);
+cb374c99 (asagrave        2025-09-23 08:56:20 -0400 25) 
+1f6cd5b8 (asagrave        2025-09-25 08:22:11 -0400 26) // Scan PATH entries and log vulnerabilities to PATH.txt
+1f6cd5b8 (asagrave        2025-09-25 08:22:11 -0400 27) // Returns the number of problems found
+1f6cd5b8 (asagrave        2025-09-25 08:22:11 -0400 28) int get_path_vulnerabilities(const std::vector<std::string>& paths);
+1f6cd5b8 (asagrave        2025-09-25 08:22:11 -0400 29) 
+1f6cd5b8 (asagrave        2025-09-25 08:22:11 -0400 30) #endif // ASAGRAVE_H
+c0ab5045 (asagrave        2025-09-25 08:07:33 -0400 31) 
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400   1) #include "asagrave.h"
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400   2) #include <vector>
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400   3) #include <string>
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400   4) #include <fstream>
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400   5) #include <sstream>
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400   6) #include <sys/types.h>
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400   7) #include <sys/stat.h>
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400   8) #include <dirent.h>
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400   9) #include <unistd.h>
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400  10) #include <unordered_map>
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  11) 
+fbd494b5 (asagrave 2025-09-25 08:37:20 -0400  12) // Retrieve PATH entries as a vector of strings
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  13) std::vector<std::string> get_paths() {
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  14)     std::vector<std::string> paths;
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  15)     const char* path_env = getenv("PATH");
+fbd494b5 (asagrave 2025-09-25 08:37:20 -0400  16)     if (!path_env) return paths;
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  17) 
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  18)     std::string path_str(path_env);
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  19)     std::stringstream ss(path_str);
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  20)     std::string dir;
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  21)     while (std::getline(ss, dir, ':')) {
+fbd494b5 (asagrave 2025-09-25 08:37:20 -0400  22)         paths.push_back(dir); // keep empty entries (treated as ".")
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  23)     }
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  24)     return paths;
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  25) }
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  26) 
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  27) // Check if a directory (and its parents) are world-writable
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  28) bool pathutil_is_world_writable_dir(const std::string& dir) {
+d5396114 (asagrave 2025-09-25 08:41:38 -0400  29)     if (dir.empty()) return false;
+d5396114 (asagrave 2025-09-25 08:41:38 -0400  30) 
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  31)     std::string path = dir;
+d5396114 (asagrave 2025-09-25 08:41:38 -0400  32) 
+d5396114 (asagrave 2025-09-25 08:41:38 -0400  33)     // Remove trailing slashes
+d5396114 (asagrave 2025-09-25 08:41:38 -0400  34)     while (path.length() > 1 && path.back() == '/') {
+d5396114 (asagrave 2025-09-25 08:41:38 -0400  35)         path.pop_back();
+d5396114 (asagrave 2025-09-25 08:41:38 -0400  36)     }
+d5396114 (asagrave 2025-09-25 08:41:38 -0400  37) 
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  38)     struct ::stat st;
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  39) 
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  40)     while (!path.empty()) {
+d5396114 (asagrave 2025-09-25 08:41:38 -0400  41)         if (stat(path.c_str(), &st) == -1) return false;
+fbd494b5 (asagrave 2025-09-25 08:37:20 -0400  42)         if (S_ISDIR(st.st_mode) && (st.st_mode & S_IWOTH)) return true;
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  43) 
+d5396114 (asagrave 2025-09-25 08:41:38 -0400  44)         if (path == "/") break; // root reached
+d5396114 (asagrave 2025-09-25 08:41:38 -0400  45) 
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  46)         auto pos = path.find_last_of('/');
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  47)         if (pos == std::string::npos) break;
+d5396114 (asagrave 2025-09-25 08:41:38 -0400  48) 
+fbd494b5 (asagrave 2025-09-25 08:37:20 -0400  49)         if (pos == 0) path = "/";
+fbd494b5 (asagrave 2025-09-25 08:37:20 -0400  50)         else path = path.substr(0, pos);
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  51)     }
+d5396114 (asagrave 2025-09-25 08:41:38 -0400  52) 
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  53)     return false;
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  54) }
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  55) 
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400  56) // Check if directory string is relative
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  57) bool pathutil_is_relative_dir(const std::string& dir) {
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  58)     if (dir.empty() || dir == ".") return true;
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  59)     return dir[0] != '/';
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  60) }
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  61) 
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400  62) // Check if a directory or its files have vulnerabilities
+fbd494b5 (asagrave 2025-09-25 08:37:20 -0400  63) PathVulnResult pathutil_dir_has_vulnerability(const std::string& dir) {
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  64)     std::string effective = dir.empty() ? "." : dir;
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  65) 
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  66)     if (pathutil_is_relative_dir(effective)) {
+fbd494b5 (asagrave 2025-09-25 08:37:20 -0400  67)         return {true, "Relative directory"};
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  68)     }
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  69) 
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  70)     if (pathutil_is_world_writable_dir(effective)) {
+fbd494b5 (asagrave 2025-09-25 08:37:20 -0400  71)         return {true, "World-writable directory (or parent)"};
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  72)     }
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  73) 
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400  74)     // Scan files inside the directory for world-writable files
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400  75)     DIR* dp = opendir(effective.c_str());
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400  76)     if (!dp) return {false, ""};
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400  77) 
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400  78)     struct dirent* entry;
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400  79)     struct ::stat st;
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400  80)     std::string filepath;
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400  81) 
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400  82)     while ((entry = readdir(dp)) != nullptr) {
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400  83)         filepath = effective + "/" + entry->d_name;
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400  84)         if (stat(filepath.c_str(), &st) == -1) continue;
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400  85)         if (S_ISREG(st.st_mode) && (st.st_mode & S_IWOTH)) {
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400  86)             closedir(dp);
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400  87)             return {true, "World-writable file: " + filepath};
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400  88)         }
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400  89)     }
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400  90) 
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400  91)     closedir(dp);
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400  92)     return {false, ""};
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  93) }
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  94) 
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400  95) // Scan PATH entries and log vulnerabilities, including duplicate executables
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  96) int get_path_vulnerabilities(const std::vector<std::string>& paths) {
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  97)     std::ofstream report("PATH.txt");
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  98)     int problems = 0;
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  99) 
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 100)     // Map to track executable names -> first directory seen
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 101)     std::unordered_map<std::string, std::string> exe_map;
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 102) 
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400 103)     for (const auto& dir : paths) {
+fbd494b5 (asagrave 2025-09-25 08:37:20 -0400 104)         PathVulnResult result = pathutil_dir_has_vulnerability(dir);
+fbd494b5 (asagrave 2025-09-25 08:37:20 -0400 105)         if (result.vulnerable) {
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 106)             report << "[!] " << result.reason << " (" 
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 107)                    << (dir.empty() ? "." : dir) << ")\n";
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400 108)             problems++;
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400 109)         }
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 110) 
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 111)         // Scan executables for duplicates
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 112)         std::string effective = dir.empty() ? "." : dir;
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 113)         DIR* dp = opendir(effective.c_str());
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 114)         if (!dp) continue;
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 115) 
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 116)         struct dirent* entry;
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 117)         struct ::stat st;
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 118)         std::string filepath;
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 119) 
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 120)         while ((entry = readdir(dp)) != nullptr) {
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 121)             filepath = effective + "/" + entry->d_name;
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 122)             if (stat(filepath.c_str(), &st) == -1) continue;
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 123) 
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 124)             if (S_ISREG(st.st_mode) && (st.st_mode & S_IXUSR)) {
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 125)                 std::string exe_name = entry->d_name;
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 126)                 if (exe_map.find(exe_name) != exe_map.end()) {
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 127)                     report << "[!] Duplicate executable: " << exe_name
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 128)                            << " found in " << effective
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 129)                            << " (also in " << exe_map[exe_name] << ")\n";
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 130)                     problems++;
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 131)                 } else {
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 132)                     exe_map[exe_name] = effective;
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 133)                 }
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 134)             }
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 135)         }
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 136) 
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 137)         closedir(dp);
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400 138)     }
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400 139) 
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400 140)     report.close();
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400 141)     return problems;
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400 142) }
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400 143) 
