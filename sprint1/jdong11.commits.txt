@@ -1,0 +1,246 @@
+2ad3bad6 (Jason Dong 2025-09-19 20:47:39 -0400   1) #include "jdong11.h"
+2ad3bad6 (Jason Dong 2025-09-19 20:47:39 -0400   2) #include <iostream>
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400   3) #include <fstream>
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400   4) #include <unistd.h>
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400   5) #include <stdlib.h>
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400   6) #include <vector>
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400   7) #include <sstream>
+2ad3bad6 (Jason Dong 2025-09-19 20:47:39 -0400   8) 
+2ad3bad6 (Jason Dong 2025-09-19 20:47:39 -0400   9) using namespace std;
+2ad3bad6 (Jason Dong 2025-09-19 20:47:39 -0400  10) 
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400  11) // runs /etc/apt/sources.list if Ubuntu <22.04
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400  12) // runs /etc/apt/sources.list.d/ubuntu.sources if Ubuntu >=22.04
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  13) void check_sources_list() {
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  14)     // first check for user permissions: require root permission
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  15)     if (geteuid() != 0) {
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  16)         cerr << "You need \"root\" permission to check /etc/apt/sources.list" << endl;
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  17)         return;
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  18)     }
+2ad3bad6 (Jason Dong 2025-09-19 20:47:39 -0400  19) 
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  20)     // open file and error checking the file
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  21)     ifstream file("/etc/apt/sources.list");
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  22)     if (file.fail()) {
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  23)         cerr << "/etc/apt/sources.list failed to open." << endl;
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  24)         file.close();
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  25)         return;
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  26)     }
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  27)     
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  28)     // reading from file and checking if valid
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  29)     printf("Checking /etc/apt/sources.list...\n");
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  30)     
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  31)     string line; 
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  32)     int numUnknownSources = 0;
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  33)     vector<string> sources;
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  34)     bool deb822Format = false;
+2ad3bad6 (Jason Dong 2025-09-19 20:47:39 -0400  35) 
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  36)     // checking for urls in sources.list
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  37)     while (getline(file, line)) {
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  38)         if (line.find("http") != string::npos) {
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  39)             if (line[0] == '#') {   // skip commented lines
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  40)                 continue; 
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  41)             }
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  42)             sources.push_back(line);
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  43)         }
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  44)     }
+2ad3bad6 (Jason Dong 2025-09-19 20:47:39 -0400  45) 
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  46)     file.clear(); // clear any error flags
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  47)     file.seekg(0, ios::beg); // reset file pointer to beginning
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  48) 
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400  49)     // parse the file line by line for deb822 which means the actual sources are in a different path Ubuntu 22.04+
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  50)     while (getline(file, line)) {
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  51)         if (line.find("deb822") != string::npos) {
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  52)             cout << "Found deb822 format, switching to ubuntu.sources file..." << endl;
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  53)             file.close();
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  54)             file.clear();
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  55)             file.open("/etc/apt/sources.list.d/ubuntu.sources");
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  56)             if (file.fail()) {
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  57)                 cerr << "/etc/apt/sources.list.d/ubuntu.sources failed to open." << endl;
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  58)                 return;
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  59)             }
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  60)             deb822Format = true;
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  61)             break; 
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  62)         }
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  63)     }
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  64) 
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  65)     // If switched to deb822 format, check new file for URIs
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  66)     if (deb822Format) {
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  67)         cout << "Checking /etc/apt/sources.list.d/ubuntu.sources file..." << endl;
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  68)         while (getline(file, line)) {
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  69)             if (line.find("http") != string::npos) {
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  70)                 if (line[0] == '#') {
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  71)                     continue;
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  72)                 }
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  73)                 sources.push_back(line);
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  74)             }
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  75)         }
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  76)     }
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  77) 
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  78)     // Print out the unknown sources
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400  79)     cout << sources.size() << " total sources found..." << endl;
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  80)     for (size_t i = 0; i < sources.size(); i++) {
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  81)         if (!deb822Format) {
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  82)             // Check if it's not one of the valid Ubuntu sources with sources.list format
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  83)             if (
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  84)                 sources[i].find("deb http://archive.ubuntu.com/ubuntu/") == string::npos &&
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  85)                 sources[i].find("deb http://security.ubuntu.com/ubuntu/") == string::npos &&
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  86)                 sources[i].find("deb-src http://archive.ubuntu.com/ubuntu/") == string::npos && 
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  87)                 sources[i].find("deb-src http://security.ubuntu.com/ubuntu/") == string::npos &&
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  88)                 sources[i].find("deb http://archive.canonical.com/ubuntu") == string::npos &&
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  89)                 sources[i].find("deb-src http://archive.canonical.com/ubuntu") == string::npos
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  90)                 ) {
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  91)                 cout << "Unknown source found: " << sources[i] << endl;
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  92)                 numUnknownSources += 1;
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  93)             }
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  94)         }
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  95)         // Check if it's not one of the valid Ubuntu sources with deb822 format
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  96)         else {
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  97)             if (
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  98)                 sources[i].find("http://archive.ubuntu.com/ubuntu/") == string::npos &&
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  99)                 sources[i].find("http://security.ubuntu.com/ubuntu/") == string::npos &&
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400 100)                 sources[i].find("http://archive.canonical.com/ubuntu") == string::npos &&
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400 101)                 sources[i].find("http://help.ubuntu.com/community/UpgradeNotes") == string::npos
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400 102)                 ) {
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400 103)                 cout << "Unknown source found: " << sources[i] << endl;
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400 104)                 numUnknownSources += 1;
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400 105)             }
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400 106)         }
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400 107)     }
+2ad3bad6 (Jason Dong 2025-09-19 20:47:39 -0400 108) 
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400 109)     file.close();
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400 110)     cout << "!!! Num Unknown sources: " << numUnknownSources << " ^^^" << endl << endl;
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400 111) }
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 112) 
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 113) // checks /etc/group for users in sudo group
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 114) void check_sudo() {
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 115)     // Open /etc/group file to check sudo group members
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 116)     ifstream file("/etc/group");
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 117)     if (file.fail()) {
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 118)         cerr << "/etc/group failed to open." << endl;
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 119)         return;
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 120)     }
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 121) 
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 122)     string line;
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 123)     stringstream sin;
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 124)     string user;
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 125)     bool comma = true;
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 126)     
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 127)     printf("Checking /etc/group for sudo users...\n");
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 128) 
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 129)     // reads each line in file
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 130)     while (getline(file, line)) {
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 131)         if (line.find("sudo:") != string::npos) {
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 132)             // gets skips sudo:x:27:
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 133)             line = line.substr(line.find(":") + 1); 
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 134)             line = line.substr(line.find(":") + 1);
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 135)             line = line.substr(line.find(":") + 1);
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 136)             
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 137)             // put line into stringstream for parsing
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 138)             sin.str(line);
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 139)             sin.clear();
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 140)             
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 141)             // parsing the comma-separated list of users into terminal
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 142)             cout << "!!! Users in sudo group: ";
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 143)             while (getline(sin, user, ',')) {
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 144)                 if (comma) {
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 145)                     cout << user;
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 146)                     comma = false;
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 147)                 }
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 148)                 else {
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 149)                     cout << ", " << user;
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 150)                 }
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 151)             }
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 152)             cout << endl << endl;
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 153)         }
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 154)     }
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 155)     file.close();    
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 156) }
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 157) 
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 158) void check_sys_updated() {
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 159)     printf("Checking if system is up to date...\n");
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 160)     system("mkdir -p /var/log/NoPUppies4U");
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 161)     system("apt update --quiet --assume-yes >/var/log/NoPUppies4U/update.log");
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 162)     system("apt list --upgradable > /var/log/NoPUppies4U/upgradable.log");
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 163) 
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 164)     string buffer;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 165)     string userInput;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 166)     bool updateSignal = false;      // true if system is not up to date
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 167)     bool updated = false;           // true if user chose to update system
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 168)     ifstream file("/var/log/NoPUppies4U/update.log");
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 169) 
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 170)     //error checking file
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 171)     if (file.fail()) {
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 172)         cerr << "/var/log/NoPUppies4U/update.log failed to open." << endl;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 173)         return;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 174)     }
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 175)     
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 176)     // parse through each line of update.log
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 177)     while (getline(file, buffer)) {
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 178)         if (buffer.find("All packages are up to date.") != string::npos) {
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 179)             cout << "!!! System is up to date (^_^)" << endl << endl;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 180)             file.close();
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 181)             return;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 182)         }
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 183)         else if (buffer.find("packages can be upgraded.") != string::npos || buffer.find("package can be upgraded.") != string::npos) {
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 184)             cout << "System is >NOT< up to date." << endl;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 185)             updateSignal = true;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 186)         }
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 187)     }
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 188) 
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 189)     // if system is not up to date, prompt user to upgrade now, skip upgrade, or list upgradable packages
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 190)     while (updateSignal) {
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 191)         userInput.clear();
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 192)         cout << "Enter \'n\' to skip upgrade. Enter \'y\' to upgrade now. Enter \'l\' to list packages upgradable list: > ";
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 193)         cin >> userInput;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 194) 
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 195)         switch(userInput[0]) {
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 196)             case 'y': 
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 197)                 cout << "Upgrading system now..." << endl;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 198)                 system("apt upgrade --quiet --assume-yes >/var/log/NoPUppies4U/upgrade.log 2>/var/log/NoPUppies4U/error.log");
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 199)                 cout << "System upgrade complete. Check /var/log/NoPUppies4U/upgrade.log for details." << endl;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 200)                 updated = true;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 201)                 updateSignal = false;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 202)                 break;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 203)             case 'n': 
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 204)                 updateSignal = false;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 205)                 break;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 206)             case 'l':
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 207)                 system("apt list --upgradable");
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 208)                 break;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 209)             default: 
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 210)                 cerr << "Invalid input. Please enter \'y\', \'n\', or \'l\'." << endl;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 211)                 break;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 212)         }
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 213)     }
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 214) 
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 215)     // checking for errors in error.log if system was updated
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 216)     if (updated) {
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 217)         ifstream errorFile("/var/log/NoPUppies4U/error.log");
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 218) 
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 219)         // error checking error.log file
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 220)         if (errorFile.fail()) {
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 221)             cerr << "/var/log/NoPUppies4U/error.log failed to open." << endl;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 222)             return;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 223)         }
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 224)         if (errorFile.peek() == ifstream::traits_type::eof() ) {
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 225)             cout << "No errors found..." << endl;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 226)         }
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 227)         else {
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 228)             cout << "Errors occurred during update. Check /var/log/NoPUppies4U/error.log for details." << endl;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 229)         }
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 230)         errorFile.close();
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 231)     }
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 232) 
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 233)     cout << "All logs are in /var/log/NoPUppies4U/" << endl << endl;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 234) 
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 235)     file.close();
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 236) }
+2ad3bad6 (Jason Dong 2025-09-19 20:47:39 -0400  1) #ifndef JDONG11_H
+2ad3bad6 (Jason Dong 2025-09-19 20:47:39 -0400  2) #define JDONG11_H
+2ad3bad6 (Jason Dong 2025-09-19 20:47:39 -0400  3) 
+2ad3bad6 (Jason Dong 2025-09-19 20:47:39 -0400  4) using namespace std;
+2ad3bad6 (Jason Dong 2025-09-19 20:47:39 -0400  5) 
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  6) void check_sources_list();           // check if /etc/apt/sources.list file is valid
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  7) void check_sudo();                   // check all users in sudo group
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  8) void check_sys_updated();            // check if system is up-to-date
+2ad3bad6 (Jason Dong 2025-09-19 20:47:39 -0400  9) 
+2ad3bad6 (Jason Dong 2025-09-19 20:47:39 -0400 10) #endif
