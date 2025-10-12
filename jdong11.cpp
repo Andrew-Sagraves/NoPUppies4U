@@ -272,17 +272,19 @@ void ufwHelpPrint() {
     << "template: [allow|deny|reject|limit] [in|out] from [source] to [destination] [port#] proto [tcp|udp]" << endl
     << "Use \'any\' for \'source\' or \'destination\' for any ip address." << endl << endl
 
-    << "Inside template writing mode (w)"
-    << "a - allow:          allow traffic though firewall" << endl
-    << "d - deny:           deny traffic through firewall (silently drop)" << endl
-    << "r - reject:         deny packets though firewall (send back RST)" << endl
-    << "c - limit:          allows traffic with rate-limit connections (cap)" << endl
-    << "i - in:             inbound traffic" << endl
-    << "o - out:            outbound traffic" << endl
-    << "s [IP] - source [IP]:         source ip (origin of traffic)" << endl
-    << "d [IP]- destination [IP]:    destination ip (where packets end up)" << endl
-    << "p [1-65535] - port [1-65535]:           destination port" << endl
-    << "f [tcp/udp]- proto[tcp/ufp]:          protocol of traffic (format)" << endl << endl
+    << "exiting write mode \'b\'" << endl << endl
+
+    << "modifying template \'writing mode (w)\'" << endl
+    << "a - allow:                          allow traffic though firewall" << endl
+    << "d - deny:                           deny traffic through firewall (silently drop)" << endl
+    << "r - reject:                         deny packets though firewall (send back RST)" << endl
+    << "c - limit:                          allows traffic with rate-limit connections (cap)" << endl
+    << "i - in:                             inbound traffic" << endl
+    << "o - out:                            outbound traffic" << endl
+    << "s [IP] - source [IP]:               source ip (origin of traffic) [IPv4]" << endl
+    << "t [IP] - destination [IP]:          target destination ip (where packets end up) [IPv4]" << endl
+    << "p [1-65535] - port [1-65535]:       destination port" << endl
+    << "f [tcp/udp] - proto[tcp/ufp]:       protocol of traffic (format)" << endl << endl
 
     << "Example Usage of Write Mode: " << endl
     << "1.) allow in from any to any 22 proto tcp: this allows ssh in"
@@ -291,8 +293,63 @@ void ufwHelpPrint() {
     << "sending DNS queries to 8.8.8.8" << endl;
 }
 
-void ufwWriteTemplMode() {
-    cout << "template mode" << endl;
+void ufwWriteTemplMode(string &filter, string &trafDir, string &source, string &dest, string &port, string &proto) {
+    bool back = false;
+    string input;
+
+    // add error checking later!!!
+    while (!back) {
+        // first input takes in what 1 of the 6 to fill
+        cin >> input;
+        switch (input[0]) {
+            case 'b': 
+                back = true;
+                break;
+            case 'a':
+                filter = "allow";
+                break;
+            case 'd':
+                filter = "deny";
+                break;
+            case 'r':
+                filter = "reject";
+                break;
+            case 'c':
+                filter = "limit";
+                break;
+            case 'i':
+                trafDir = "in";
+                break;
+            case 'o':
+                trafDir = "out";
+                break;
+            case 's':
+                cin >> source;
+                break;
+            case 't':
+                cin >> dest;
+                break;
+            case 'p': 
+                cin >> port;
+                break;
+            case 'f':
+                cin >> proto;
+                break;
+            default:
+                cout << "Invalid Input (Usage): " << endl
+                     << "a - allow:                          allow traffic though firewall" << endl
+                     << "d - deny:                           deny traffic through firewall (silently drop)" << endl
+                     << "r - reject:                         deny packets though firewall (send back RST)" << endl
+                     << "c - limit:                          allows traffic with rate-limit connections (cap)" << endl
+                     << "i - in:                             inbound traffic" << endl
+                     << "o - out:                            outbound traffic" << endl
+                     << "s [IP] - source [IP]:               source ip (origin of traffic) [IPv4]" << endl
+                     << "t [IP] - destination [IP]:          target destination ip (where packets end up) [IPv4]" << endl
+                     << "p [1-65535] - port [1-65535]:       destination port" << endl
+                     << "f [tcp/udp] - proto[tcp/ufp]:       protocol of traffic (format)" << endl << endl
+                break;
+        }
+    }
 }
 
 // check the Uncomplicated Firewall status
@@ -414,7 +471,7 @@ void check_ufw() {
                             cout << "Protocol: " << proto << endl << endl;
                             break;
                         case 'w': 
-                            ufwWriteTemplMode();
+                            ufwWriteTemplMode(filter, trafDir, source, dest, port, proto);
                             break;
                         case 'a': 
                             cout << "Adding Rule..." << endl;
