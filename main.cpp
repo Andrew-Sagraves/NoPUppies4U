@@ -9,6 +9,7 @@
 #include "bmulli21.h"
 #include "jdong11.h"
 #include "kbissonn.h"
+#include "hclark37.h"
 #include <vector>
 #include <iomanip>
 
@@ -35,6 +36,8 @@ int main(int argc, char* argv[]) {
 		{"sources", no_argument,	0, 'x'},
 		{"all", no_argument,		0, 'a'},
 		{"directory", required_argument,	0, 'd'},
+		{"firewall", no_argument,		0, 'f'},
+		{"passwords", no_argument,		0, 'u'},
 		{0, 0, 0, 0}
 	};
 	
@@ -46,7 +49,7 @@ int main(int argc, char* argv[]) {
 		return 0;
 	}
 	
-	while ((opt = getopt_long(argc, argv, "hcpxad:", long_options, &options_index)) != -1) { //hvscp lets short options work, like -s
+	while ((opt = getopt_long(argc, argv, "hcpxafud:", long_options, &options_index)) != -1) { //hvscp lets short options work, like -s
 		//you have to make sure to add any additional options to that ""
 		
 		switch (opt) {
@@ -57,9 +60,11 @@ int main(int argc, char* argv[]) {
 				cout << "  " << left << setw(25) << "-h,   --help"    << "Show this help message" << endl;
 				cout << "  " << left << setw(25) << "-c,   --crontab" << "Check crontab" << endl;
 				cout << "  " << left << setw(25) << "-x,   --sources" << "Check all sources" << endl;
+				cout << "  " << left << setw(25) << "-u,   --passwords"    << "Check for unsecured users" << endl;
 				cout << "  " << left << setw(25) << "-p,   --path"    << "Check path" << endl;
 				cout << "  " << left << setw(25) << "-a,   --all"     << "Run all tests" << endl;
 				cout << "  " << left << setw(25) << "-d,   --directory"     << "Check directory for changes" << endl;
+				cout << "  " << left << setw(25) << "-f,   --firewall"     << "Check firewall for vulnerabilities" << endl;
 				return 0;
 				break;
 				
@@ -76,7 +81,15 @@ int main(int argc, char* argv[]) {
 				
 				//i'm choosing to not include directory case in this because it would require the --all flag to take an argument, which wouldn't really work if another one required an argument as well
 				
+				check_empty_passwords();
+				
+				check_ufw();
+				
 				return 0;
+				break;
+			}
+			case 'u': {
+				check_empty_passwords();
 				break;
 			}
 			case 'x':
@@ -99,6 +112,10 @@ int main(int argc, char* argv[]) {
 				vector<string> paths = get_paths();
 				int problems = get_path_vulnerabilities(paths);
 				cout << "PATH scan complete. " << problems << " potential issue(s) found. Issues outputted to PATH.txt\n";
+				break;
+			}
+			case 'f': {
+				check_ufw();
 				break;
 			}
 			case '?': 
