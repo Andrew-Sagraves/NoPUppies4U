@@ -20,7 +20,7 @@ void check_empty_passwords() {
         getline(ss, user_name, ':');
         getline(ss, password_hash, ':');
 	
-	//specifiers for no password
+		//specifiers for no password
         if (password_hash.empty() || password_hash == "*" || password_hash == "!" || password_hash == "!!") {
             cout << "  - Insecure account found: " << user_name << endl;
             found_issue = true;
