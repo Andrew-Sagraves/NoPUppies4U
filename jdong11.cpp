@@ -258,7 +258,7 @@ void check_sys_updated() {
 // This function prints out instructions on how to use ufw_check().
 void ufwHelpPrint() {
     cout << endl;
-    cout << "Add Rule Main Menu Usage: " << endl;
+    cout << "Add Rule Mode Usage: " << endl;
     cout << "\'?\'      - help" << endl;
     cout << "\'l\'      - list current rules" << endl;
     cout << "\'b\'      - go back to menu" << endl;
@@ -272,7 +272,8 @@ void ufwHelpPrint() {
     << "template: [allow|deny|reject|limit] [in|out] from [source] to [destination] [port#] proto [tcp|udp]" << endl
     << "Use \'any\' for \'source\' or \'destination\' for any ip address." << endl << endl
 
-    << "exiting write mode \'b\'" << endl << endl
+    << "\'b\' - exiting write mode" << endl
+    << "\'l\' - list current template rules" << endl << endl
 
     << "modifying template \'writing mode (w)\'" << endl
     << "a - allow:                          allow traffic though firewall" << endl
@@ -300,10 +301,20 @@ void ufwWriteTemplMode(string &filter, string &trafDir, string &source, string &
     // add error checking later!!!
     while (!back) {
         // first input takes in what 1 of the 6 to fill
+        cout << "WriteTempMode> ";
         cin >> input;
+        cout << endl;
         switch (input[0]) {
             case 'b': 
                 back = true;
+                break;
+            case 'l': 
+                cout << "Filter: " << filter << endl;
+                cout << "Traffic Direction: " << trafDir << endl;
+                cout << "Source IP: " << source << endl;
+                cout << "Destination IP: " << dest << endl;
+                cout << "Destination port: " << port << endl;
+                cout << "Protocol: " << proto << endl << endl;
                 break;
             case 'a':
                 filter = "allow";
@@ -346,7 +357,7 @@ void ufwWriteTemplMode(string &filter, string &trafDir, string &source, string &
                      << "s [IP] - source [IP]:               source ip (origin of traffic) [IPv4]" << endl
                      << "t [IP] - destination [IP]:          target destination ip (where packets end up) [IPv4]" << endl
                      << "p [1-65535] - port [1-65535]:       destination port" << endl
-                     << "f [tcp/udp] - proto[tcp/ufp]:       protocol of traffic (format)" << endl << endl
+                     << "f [tcp/udp] - proto[tcp/ufp]:       protocol of traffic (format)" << endl << endl;
                 break;
         }
     }
@@ -439,7 +450,7 @@ void check_ufw() {
                 cout << "Enter \'reset\' for any time to reset rules to default." << endl;
 
                 while (!back) {
-                    cout << "Add Rule Mode(ufw)> ";
+                    cout << "AddRuleMode(ufw)> ";
                     cin >> input;
                     switch (input[0]) {
                         case '?': 
