@@ -394,6 +394,7 @@ void check_ufw() {
     }
     else {
         system("apt --quiet --assume-yes install ufw");
+        // !!! Quality of life add: ask if enable firewall here...
     }
     file.clear();
     file.close();
