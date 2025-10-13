@@ -1,0 +1,121 @@
+bmulli21.cpp
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400   5) #include <fstream>
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400   7) #include <sys/stat.h>
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400   8) #include <map>
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400   9) #include <sstream>
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  13) //Loads previous date modified time from a file into a map
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  14) map<string, time_t> load_previous_date_modified(const string& dateModifiedFile) {
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  15)     map<string, time_t> timestamps;
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  16)     ifstream recordFile(dateModifiedFile);
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  18)     if (!recordFile.is_open()) {
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  19)         cout << "date_modified.txt not found. Creating new file." << endl;
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  20)         return timestamps; //Return an empty map
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  21)     }
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  23)     string line;
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  24) 
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  25)     while (getline(recordFile, line)) {
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  26)         stringstream stringStream(line);
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  27)         string filePath;
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  28)         time_t dateModified;
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  29)         
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  30)         //Format = <filepath> - <datemodified>
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  31)         if (getline(stringStream, filePath, '-') && stringStream >> dateModified) {
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  32)             //Removes space at end of filePath if it exists
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  33)             if (!filePath.empty() && filePath.back() == ' ') {
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  34)                 filePath.pop_back();
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  35)             }
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  36) 
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  37)             timestamps[filePath] = dateModified;
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  38)         }
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  41)     recordFile.close();
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  42) 
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  43)     return timestamps;
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  47) //Creates a vector of all files in a directory and subdirectories
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  48) vector<string> get_all_files_recursively(const string& directoryPath) {
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  49)     vector<string> filePath;
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  51)     if (!filesystem::is_directory(directoryPath)) {
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  52)         cerr << "Error: Not a valid directory - " << directoryPath << endl;
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  53)         return filePath; // Return empty list
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  56)     //Iterators to go through directory and subdirectories
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  58)     filesystem::recursive_directory_iterator endingIterator;
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  60)     for (; iterator != endingIterator; ++iterator) {
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  78)         }
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  79)     }
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  80)     
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  81)     return filePath;
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  85) //This is an all in one function that does everything.
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  86) //Checks a directory for changed files, generates a report, and updates records.
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  95)     const string dateModifiedTxt = "date_modified.txt";
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  96)     const string newlyDateModifiedTxt = "new_date_modified.txt";
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 106)     //Get a list of all files currently in the directory and subdirectories
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 109)     if (currentFiles.empty()) {
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 110)         cout << "No files found in directory." << endl;
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 111)         return;
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 112)     }
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 113) 
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 114)     vector<string> newlyModifiedFiles;
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 115) 
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 116)     //New file to store updated timestamps
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 117)     ofstream newModifiedFile(dateModifiedTxt, ios::trunc);
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 119)     if (!newModifiedFile.is_open()) {
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 120)         cerr << "Error: Could not open record file - " << dateModifiedTxt << endl;
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 121)         return;
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 122)     }
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 124)     cout << "Scanning " << currentFiles.size() << " files..." << endl;
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 125) 
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 126)     //Loops through all current files to check for modifications
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 127)     for (size_t i = 0; i < currentFiles.size(); ++i) {
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 128)         const string& filePath = currentFiles[i];
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 129)         struct stat fileStat;
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 130) 
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 131)         //Gets the file's current modified time
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 132)         if (stat(filePath.c_str(), &fileStat) == 0) {
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 133)             time_t currentModifiedTime = fileStat.st_mtime;
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 134) 
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 135)             //Format: <filepath> - <datemodified>
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 136)             newModifiedFile << filePath << " - " << currentModifiedTime << "\n";
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 137) 
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 138)             //Checks if this file was modified
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 139)             if (oldDateModified.count(filePath)) {
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 140)                 //If the file is already there, compare its old and new timestamps.
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 141)                 if (currentModifiedTime > oldDateModified[filePath]) {
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 142)                     newlyModifiedFiles.push_back(filePath);
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 143)                 }
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 144)             } else {
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 145)                 //If the file is new, add it to the modified list
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 146)                 newlyModifiedFiles.push_back(filePath);
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 147)             }
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 148)         }
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 149)     }
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 150) 
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 151)     newModifiedFile.close();
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 152) 
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 153)     //If any files were modified, create a report file
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 154)     if (!newlyModifiedFiles.empty()) {
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 155)         cout << newlyModifiedFiles.size() << " file(s) have been modified or added." << endl;
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 156)         cout << "Creating report file: " << newlyDateModifiedTxt << endl;
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 157) 
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 158)         ofstream reportDateModified(newlyDateModifiedTxt, ios::trunc);
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 159) 
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 160)         if (!reportDateModified.is_open()) {
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 161)             cerr << "Error: Could not open report file - " << newlyDateModifiedTxt << endl;
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 162)         } else {
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 163)             for (size_t i = 0; i < newlyModifiedFiles.size(); ++i) {
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 164)                 reportDateModified << newlyModifiedFiles[i] << "\n";
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 165)             }
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 166)             reportDateModified.close();
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 167)         }
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 168)     } else {
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 169)         cout << "No files have been modified since the last check." << endl;
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 170)     }
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 172)     cout << "Check complete! Date modified times are now up to date." << endl;
+
+bmulli21.h
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  5) #include <vector>
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  6) #include <map>
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400  7) #include <ctime>
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 18) //Loads original date modified times from a file for comparison into a map
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 19) map<string, time_t> load_previous_date_modified(const string& dateModifiedFile);
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 20) //Recursively finds and stores all files in a directory and subdirectories in a vector
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 21) vector<string> get_all_files_recursively(const string& directoryPath);
+4d2003d3 (bmulli17          2025-09-29 16:50:55 -0400 22) //All in one function to create a date modified file and check against that file on subsequent runs
