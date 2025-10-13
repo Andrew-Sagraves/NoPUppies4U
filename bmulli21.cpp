@@ -54,30 +54,58 @@ vector<string> get_all_files_recursively(const string& directoryPath) {
     }
 
     //Iterators to go through directory and subdirectories
-    filesystem::recursive_directory_iterator iterator(directoryPath);
+    filesystem::recursive_directory_iterator iterator(directoryPath, filesystem::directory_options::skip_permission_denied);
     filesystem::recursive_directory_iterator endingIterator;
 
     for (; iterator != endingIterator; ++iterator) {
-        //Only adds files, not directories or other types like symlinks
-        if (filesystem::is_regular_file(iterator->path())) {
-            filePath.push_back(iterator->path().string());
+        try {
+            const auto& path = iterator->path();
+            string pathStr = path.string();
+            
+            // Skip hidden directories/files if ignoreHidden flag is set
+            if (pathStr.find("/.")  != string::npos || pathStr.find("\\.") != string::npos) {
+                iterator.disable_recursion_pending();
+                continue;
+            }
+
+            //Only adds files, not directories or other types like symlinks
+            if (filesystem::is_regular_file(path)) {
+                filePath.push_back(pathStr);
+            }
+        } catch (const filesystem::filesystem_error& e) {
+            cerr << "Error accessing path: " << e.what() << endl;
+            continue;
         }
     }
+    
+    return filePath;
     
     return filePath;
 }
 
 //This is an all in one function that does everything.
 //Checks a directory for changed files, generates a report, and updates records.
-void check_directory_for_changes(const string& checkingDirectory) {
+void check_directory_for_changes(const string& checkingDirectory, const DirectoryCheckFlags& flags) {
+    // If root check flag is set and directory isn't already root, start from root
+    string effectiveDirectory = checkingDirectory;
+    if (flags.rootCheck && checkingDirectory != "/") {
+        effectiveDirectory = "/";
+        cout << "Root check flag set. Checking entire system from root directory." << endl;
+    }
+
     const string dateModifiedTxt = "date_modified.txt";
     const string newlyDateModifiedTxt = "new_date_modified.txt";
 
-    //Load the old timestamps into our efficient map.
-    map<string, time_t> oldDateModified = load_previous_date_modified(dateModifiedTxt);
+    //Load the old timestamps into our efficient map, unless writeNew flag is set
+    map<string, time_t> oldDateModified;
+    if (!flags.writeNew) {
+        oldDateModified = load_previous_date_modified(dateModifiedTxt);
+    } else {
+        cout << "Write new flag set. Ignoring existing date_modified.txt file." << endl;
+    }
 
     //Get a list of all files currently in the directory and subdirectories
-    vector<string> currentFiles = get_all_files_recursively(checkingDirectory);
+    vector<string> currentFiles = get_all_files_recursively(effectiveDirectory);
 
     if (currentFiles.empty()) {
         cout << "No files found in directory." << endl;
@@ -143,4 +171,55 @@ void check_directory_for_changes(const string& checkingDirectory) {
     }
 
     cout << "Check complete! Date modified times are now up to date." << endl;
+}
+
+//A helper function to parse a given log file for a list of keywords.
+void parse_log_file(const string& logFilePath, const vector<string>& keywords, const string& reportFile) {
+    ifstream logFile(logFilePath);
+
+    //Check if the log file can be opened. Permissions might be an issue.
+    if (!logFile.is_open()) {
+        cerr << "Error: Could not open log file - " << logFilePath 
+             << ". Try running with sudo permissions." << endl;
+        return;
+    }
+
+    ofstream report(reportFile);
+    if (!report.is_open()) {
+        cerr << "Error: Could not create report file for writing - " << reportFile << endl;
+        logFile.close();
+        return;
+    }
+
+    cout << "Parsing " << logFilePath << " for keywords..." << endl;
+    long matchCount = 0;
+    string line;
+
+    //Read the log file line by line
+    while (getline(logFile, line)) {
+        //Check if any of the keywords are present in the current line
+        for (const string& keyword : keywords) {
+            if (line.find(keyword) != string::npos) {
+                report << line << "\n";
+                matchCount++;
+                break; // Keyword found, no need to check for others on this line
+            }
+        }
+    }
+
+    logFile.close();
+    report.close();
+
+    cout << "Log parsing complete. Found " << matchCount << " matching lines." << endl;
+    cout << "Report saved to " << reportFile << endl;
+}
+
+//Parses the main system log (/var/log/syslog) for keywords.
+void parse_system_logs(const vector<string>& keywords, const string& reportFile) {
+    parse_log_file("/var/log/syslog", keywords, reportFile);
+}
+
+//Parses the kernel log (/var/log/kern.log) for keywords.
+void parse_kernel_logs(const vector<string>& keywords, const string& reportFile) {
+    parse_log_file("/var/log/kern.log", keywords, reportFile);
 }
