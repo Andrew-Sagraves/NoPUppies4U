@@ -27,5 +27,9 @@ PathVulnResult pathutil_dir_has_vulnerability(const std::string& dir);
 // Returns the number of problems found
 int get_path_vulnerabilities(const std::vector<std::string>& paths);
 
+bool passwordless_sudo_access(const std::string& logDir);
+bool world_writable_ssh_keys(const std::string& logDir);
+bool suid_binary_audit(const std::string& logDir);
+
 #endif // ASAGRAVE_H
 
