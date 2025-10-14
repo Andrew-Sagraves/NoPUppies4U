@@ -10,6 +10,8 @@
 #include <unistd.h>
 #include <unordered_map>
 #include <vector>
+#include <cstring>
+
 
 // Retrieve PATH entries as a vector of strings
 std::vector<std::string> get_paths() {
@@ -158,7 +160,7 @@ int get_path_vulnerabilities(const std::vector<std::string> &paths) {
 // Utility functions
 // --------------------------------------------------------------
 
-// Create a directory if it doesn’t exist
+// Create a directory if it doesnât exist
 void ensure_dir(const std::string& path) {
     struct stat st;
     if (stat(path.c_str(), &st) != 0) {
