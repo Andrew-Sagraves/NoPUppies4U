@@ -28,6 +28,7 @@ void check_cron_jobs();
 void list_cronjob_commands();
 
 
-//void check_sudoers();
+// Looks through the sudoers file and prints out all unique users with sudo permissions
+void check_sudoers();
 
 #endif
