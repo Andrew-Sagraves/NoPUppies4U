@@ -21,7 +21,6 @@ int main(int argc, char* argv[]) {
 		- Check to see if argv[i] is a valid --(command)
 		- If (command) requires input, check argv[i + 1] for valid input. If so, increment i to skip it for next, and process it, otherwise, error? 
 		- Goal: have it always either work or fail. No unexpected states 
-
 		
 		-p for path
 		-c for crontab
@@ -44,6 +43,9 @@ int main(int argc, char* argv[]) {
 		{"ignore-hidden", no_argument,       0, 'i'},
 		{"sudo-group",     no_argument, 0, 'g'}, 
 		{"system-update",  no_argument, 0, 'U'},
+		{"system-logs",  required_argument, 0, 'L'}, 
+		{"kernel-logs",  required_argument, 0, 'K'}, 
+		{"no-pass", no_argument, 0, 'E'},
 		{0, 0, 0, 0}
 	};
 	
@@ -59,7 +61,7 @@ int main(int argc, char* argv[]) {
 	
 	string logDir = "./"; //may not be hardcoded later
 	
-	while ((opt = getopt_long(argc, argv, "hrwicpksbagUd:", long_options, &options_index)) != -1) { //hvscp lets short options work, like -s
+	while ((opt = getopt_long(argc, argv, "hrwicpEksbagUd:L:K:", long_options, &options_index)) != -1) { //hvscp lets short options work, like -s
 		//you have to make sure to add any additional options to that ""
 		
 		switch (opt) {
@@ -79,7 +81,9 @@ int main(int argc, char* argv[]) {
 				cout << "  " << left << setw(25) << "-i,   --ignore-hidden"  << "Skip hidden files and folders" << endl;
 				cout << "  " << left << setw(25) << "-g,   --sudo-group"     << "List users with sudo privileges" << endl;
 				cout << "  " << left << setw(25) << "-U,   --system-update"  << "Check if system is up to date" << endl;
-
+				cout << "  " << left << setw(25) << "-L, --system-logs <word1,word2>" << "Parse /var/log/syslog for keywords" << endl;
+				cout << "  " << left << setw(25) << "-K, --kernel-logs <word1,word2>" << "Parse /var/log/kern.log for keywords" << endl;
+				cout << "  " << left << setw(25) << "-E,   --no-pass"  << "Find users with empty passwords" << endl;
 				return 0;
 				break;
 			//confusing about how this would work with all- because of how --all exists?
@@ -95,7 +99,7 @@ int main(int argc, char* argv[]) {
 				dirFlags.ignoreHidden = true;
 				break;
 			
-
+			
 			case 'a': {
 				//add all your functions here- this is the "all" option
 				suid_binary_audit(logDir);
@@ -120,6 +124,36 @@ int main(int argc, char* argv[]) {
 				return 0;
 				break;
 			}
+			
+			case 'E':
+				cout << "Checking for users with empty passwords..." << endl;
+				check_empty_passwords();
+				break;
+			
+			case 'L': { 
+				string argument = optarg; 
+				vector<string> keywords;
+				stringstream ss(argument);
+				string word;
+				while (getline(ss, word, ',')) {
+					keywords.push_back(word);
+				}
+				parse_system_logs(keywords, "system_log_report.txt");
+				break;
+			}
+
+			case 'K': {
+				string argument = optarg;
+				vector<string> keywords;
+				stringstream ss(argument);
+				string word;
+				while (getline(ss, word, ',')) {
+					keywords.push_back(word);
+				}
+				parse_kernel_logs(keywords, "kernel_log_report.txt");
+				break;
+			}
+
 			
 			case 'g':  
 				check_sudo();
