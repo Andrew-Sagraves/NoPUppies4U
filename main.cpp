@@ -46,6 +46,7 @@ int main(int argc, char* argv[]) {
 		{"system-logs",  required_argument, 0, 'L'}, 
 		{"kernel-logs",  required_argument, 0, 'K'}, 
 		{"no-pass", no_argument, 0, 'E'},
+		{"sudoers", no_argument, 0, 'S'},
 		{0, 0, 0, 0}
 	};
 	
@@ -61,7 +62,7 @@ int main(int argc, char* argv[]) {
 	
 	string logDir = "./"; //may not be hardcoded later
 	
-	while ((opt = getopt_long(argc, argv, "hrwicpEksbagUd:L:K:", long_options, &options_index)) != -1) { //hvscp lets short options work, like -s
+	while ((opt = getopt_long(argc, argv, "hrwicpSEksbagUd:L:K:", long_options, &options_index)) != -1) { //hvscp lets short options work, like -s
 		//you have to make sure to add any additional options to that ""
 		
 		switch (opt) {
@@ -84,6 +85,8 @@ int main(int argc, char* argv[]) {
 				cout << "  " << left << setw(25) << "-L, --system-logs <word1,word2>" << "Parse /var/log/syslog for keywords" << endl;
 				cout << "  " << left << setw(25) << "-K, --kernel-logs <word1,word2>" << "Parse /var/log/kern.log for keywords" << endl;
 				cout << "  " << left << setw(25) << "-E,   --no-pass"  << "Find users with empty passwords" << endl;
+				cout << "  " << left << setw(25) << "-S,   --sudoers" << "Scan sudoers files for users with sudo access" << endl;
+
 				return 0;
 				break;
 			//confusing about how this would work with all- because of how --all exists?
@@ -154,6 +157,10 @@ int main(int argc, char* argv[]) {
 				break;
 			}
 
+			case 'S':
+				cout << "Checking sudoers files for explicit sudo users..." << endl;
+				check_sudoers();
+				break;
 			
 			case 'g':  
 				check_sudo();
