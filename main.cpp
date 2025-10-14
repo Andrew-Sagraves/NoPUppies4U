@@ -30,14 +30,19 @@ int main(int argc, char* argv[]) {
 	*/
 	
 	static struct option long_options[] = {
-		{"help", no_argument,		0, 'h'},
-		{"crontab", no_argument,	0, 'c'},
-		{"path", no_argument,		0, 'p'},
-		{"sources", no_argument,	0, 'x'},
-		{"all", no_argument,		0, 'a'},
-		{"directory", required_argument,	0, 'd'},
-		{"firewall", no_argument,		0, 'f'},
-		{"passwords", no_argument,		0, 'u'},
+		{"help",          no_argument,       0, 'h'},
+		{"crontab",       no_argument,       0, 'c'},
+		{"path",          no_argument,       0, 'p'}, 
+		{"sudo",          no_argument,       0, 's'}, 
+		{"ssh-keys",      no_argument,       0, 'k'},
+		{"suid",          no_argument,       0, 'b'},  
+		{"all",           no_argument,       0, 'a'},  
+		{"directory",     required_argument, 0, 'd'},
+		{"root",          no_argument,       0, 'r'},
+		{"write-new",     no_argument,       0, 'w'},
+		{"ignore-hidden", no_argument,       0, 'i'},
+		{"sudo-group",     no_argument, 0, 'g'}, 
+		{"system-update",  no_argument, 0, 'U'},
 		{0, 0, 0, 0}
 	};
 	
@@ -49,30 +54,54 @@ int main(int argc, char* argv[]) {
 		return 0;
 	}
 	
-	while ((opt = getopt_long(argc, argv, "hcpxafud:", long_options, &options_index)) != -1) { //hvscp lets short options work, like -s
+	DirectoryCheckFlags dirFlags;
+	
+	string logDir = "./"; //may not be hardcoded later
+	
+	while ((opt = getopt_long(argc, argv, "hrwicpksbagUd:", long_options, &options_index)) != -1) { //hvscp lets short options work, like -s
 		//you have to make sure to add any additional options to that ""
 		
 		switch (opt) {
 			case 'h':
 				cout << "Usage: nopuppies4u [options]" << endl;
 				cout << "Options:" << endl;
+				cout << "  " << left << setw(25) << "-h,   --help"           << "Show this help message" << endl;
+				cout << "  " << left << setw(25) << "-c,   --crontab"        << "Check crontab" << endl;
+				cout << "  " << left << setw(25) << "-p,   --path"           << "Check PATH for vulnerabilities" << endl;
+				cout << "  " << left << setw(25) << "-s,   --sudo"           << "Check for passwordless sudo access" << endl;
+				cout << "  " << left << setw(25) << "-k,   --ssh-keys"       << "Scan for world-writable SSH keys" << endl;
+				cout << "  " << left << setw(25) << "-b,   --suid"           << "Scan for SUID binaries" << endl;
+				cout << "  " << left << setw(25) << "-a,   --all"		<< "Run all security audits" << endl;
+				cout << "  " << left << setw(25) << "-d,   --directory <path>" << "Check directory for changes" << endl;
+				cout << "  " << left << setw(25) << "-r,   --root"           << "Force scan starting at root" << endl;
+				cout << "  " << left << setw(25) << "-w,   --write-new"      << "Ignore saved timestamps" << endl;
+				cout << "  " << left << setw(25) << "-i,   --ignore-hidden"  << "Skip hidden files and folders" << endl;
+				cout << "  " << left << setw(25) << "-g,   --sudo-group"     << "List users with sudo privileges" << endl;
+				cout << "  " << left << setw(25) << "-U,   --system-update"  << "Check if system is up to date" << endl;
 
-				cout << "  " << left << setw(25) << "-h,   --help"    << "Show this help message" << endl;
-				cout << "  " << left << setw(25) << "-c,   --crontab" << "Check crontab" << endl;
-				cout << "  " << left << setw(25) << "-x,   --sources" << "Check all sources" << endl;
-				cout << "  " << left << setw(25) << "-u,   --passwords"    << "Check for unsecured users" << endl;
-				cout << "  " << left << setw(25) << "-p,   --path"    << "Check path" << endl;
-				cout << "  " << left << setw(25) << "-a,   --all"     << "Run all tests" << endl;
-				cout << "  " << left << setw(25) << "-d,   --directory"     << "Check directory for changes" << endl;
-				cout << "  " << left << setw(25) << "-f,   --firewall"     << "Check firewall for vulnerabilities" << endl;
 				return 0;
 				break;
-				
+			//confusing about how this would work with all- because of how --all exists?
+			case 'r':
+				dirFlags.rootCheck = true;
+				break;
+
+			case 'w':
+				dirFlags.writeNew = true;
+				break;
+
+			case 'i':
+				dirFlags.ignoreHidden = true;
+				break;
+			
+
 			case 'a': {
 				//add all your functions here- this is the "all" option
-				
+				suid_binary_audit(logDir);
+				world_writable_ssh_keys(logDir);
+				passwordless_sudo_access(logDir);
 				check_sources_list();
-			
+				
 				vector<string> paths = get_paths();
 				int problems = get_path_vulnerabilities(paths);
 				cout << "PATH scan complete. " << problems << " potential issue(s) found. Issues outputted to PATH.txt\n";
@@ -85,15 +114,39 @@ int main(int argc, char* argv[]) {
 				
 				check_ufw();
 				
+				check_sudo();
+				check_sys_updated(); 
 				return 0;
 				break;
 			}
+			
+			case 'g':  
+				check_sudo();
+				break;
+
+			case 'U':  
+				check_sys_updated();
+				break;
+
 			case 'u': {
 				check_empty_passwords();
 				break;
 			}
+			
 			case 'x':
 				check_sources_list();
+				break;
+			
+			case 's':
+				passwordless_sudo_access(logDir);
+				break;
+			
+			case 'k':
+				world_writable_ssh_keys(logDir);
+				break;
+			
+			case 'b':
+				suid_binary_audit(logDir);
 				break;
 			
 			case 'd': {
@@ -101,8 +154,8 @@ int main(int argc, char* argv[]) {
 					cerr << "Error: --directory requires an argument" << endl;
 					return 1;
 				}
-				string directory = optarg;
-				check_directory_for_changes(directory);
+				string dir = optarg;
+				check_directory_for_changes(dir, dirFlags);
 				break;
 			}
 			case 'c':
