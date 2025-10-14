@@ -18,8 +18,8 @@ vector<string> split_tokens(const string &s);
 string sanitize_token(string t);
 // Get everthring that looks like a path from a command string
 vector<string> extract_paths(const string &cmd);
-// Get everthring that looks like a path from a command string
-void process_file(const filesystem::path &p, set<string> &checked_files);
+// Get everthring that looks like a path from a command string and put paths into a vector(for verbose)
+void process_file(const filesystem::path &p, set<string> &checked_files, bool called_from_cron = false, std::vector<std::string> *all_checked_paths = nullptr, std::vector<std::string> *writable_paths = nullptr);
 
 // Checks for cron jobs in /etc/cron.d, /etc/cron.daily, /etc/cron.hourly, /etc/cron.monthly, /etc/cron.weekly
 void check_cron_jobs();
@@ -28,6 +28,7 @@ void check_cron_jobs();
 void list_cronjob_commands();
 
 
-//void check_sudoers();
+// Looks through the sudoers file and prints out all unique users with sudo permissions
+void check_sudoers();
 
 #endif
