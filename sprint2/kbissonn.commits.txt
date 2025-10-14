@@ -1,4 +1,35 @@
 kbissonn.cpp
+4de9a5ee (kaden-bissonnette 2025-10-13 22:28:37 -0400  44)         process_file(etccrontab, checked_files, true, &all_checked_paths, &writable_paths);
+4de9a5ee (kaden-bissonnette 2025-10-13 22:28:37 -0400  56)                 process_file(entry.path(), checked_files, true, &all_checked_paths, &writable_paths);
+4de9a5ee (kaden-bissonnette 2025-10-13 22:28:37 -0400 151) void process_file(const filesystem::path &p, set<string> &checked_files, bool called_from_cron, std::vector<std::string> *all_checked_paths, std::vector<std::string> *writable_paths) {
+4de9a5ee (kaden-bissonnette 2025-10-13 22:28:37 -0400 220)                     // Determine if world-writable. Use stat to check others write bit.
+4de9a5ee (kaden-bissonnette 2025-10-13 22:28:37 -0400 221)                     bool world_writable = false;
+4de9a5ee (kaden-bissonnette 2025-10-13 22:28:37 -0400 222)                     struct stat st;
+4de9a5ee (kaden-bissonnette 2025-10-13 22:28:37 -0400 223)                     if (stat(candidate.c_str(), &st) == 0) {
+4de9a5ee (kaden-bissonnette 2025-10-13 22:28:37 -0400 224)                         world_writable = (st.st_mode & S_IWOTH) != 0;
+4de9a5ee (kaden-bissonnette 2025-10-13 22:28:37 -0400 225)                     }
+4de9a5ee (kaden-bissonnette 2025-10-13 22:28:37 -0400 226)                     // Only report writable when called from cron and file is world-writable.
+4de9a5ee (kaden-bissonnette 2025-10-13 22:28:37 -0400 227)                     if (called_from_cron && world_writable) {
+4de9a5ee (kaden-bissonnette 2025-10-13 22:28:37 -0400 228)                         cout << "[WRITABLE]";
+4de9a5ee (kaden-bissonnette 2025-10-13 22:28:37 -0400 229)                         if (writable_paths) writable_paths->push_back(candidate);
+4de9a5ee (kaden-bissonnette 2025-10-13 22:28:37 -0400 230)                     } else {
+4de9a5ee (kaden-bissonnette 2025-10-13 22:28:37 -0400 231)                         cout << "[not writable]";
+4de9a5ee (kaden-bissonnette 2025-10-13 22:28:37 -0400 232)                     }
+4de9a5ee (kaden-bissonnette 2025-10-13 22:28:37 -0400 233)                     cout << endl;
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 234)                 } else {
+4de9a5ee (kaden-bissonnette 2025-10-13 22:28:37 -0400 235)                     cout << " (missing)" << endl;
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 236)                 }
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 237)             } else {
+4de9a5ee (kaden-bissonnette 2025-10-13 22:28:37 -0400 238)                 // Cron caller: collect writable paths if world-writable
+4de9a5ee (kaden-bissonnette 2025-10-13 22:28:37 -0400 239)                 if (filesystem::exists(candidate)) {
+4de9a5ee (kaden-bissonnette 2025-10-13 22:28:37 -0400 240)                     struct stat st;
+4de9a5ee (kaden-bissonnette 2025-10-13 22:28:37 -0400 241)                     if (stat(candidate.c_str(), &st) == 0) {
+4de9a5ee (kaden-bissonnette 2025-10-13 22:28:37 -0400 242)                         if ((st.st_mode & S_IWOTH) != 0) {
+4de9a5ee (kaden-bissonnette 2025-10-13 22:28:37 -0400 243)                             if (writable_paths) writable_paths->push_back(candidate);
+4de9a5ee (kaden-bissonnette 2025-10-13 22:28:37 -0400 244)                         }
+4de9a5ee (kaden-bissonnette 2025-10-13 22:28:37 -0400 245)                     }
+4de9a5ee (kaden-bissonnette 2025-10-13 22:28:37 -0400 246)                 }
+
 918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 260) 
 918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 261) //Sudoers file check
 918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 262) void check_sudoers() {
@@ -114,66 +145,8 @@ kbissonn.cpp
 
 
 kbissonn.h
+4de9a5ee (kaden-bissonnette 2025-10-13 22:28:37 -0400 22) void process_file(const filesystem::path &p, set<string> &checked_files, bool called_from_cron = false, std::vector<std::string> *all_checked_paths = nullptr, std::vector<std::string> *writable_paths = nullptr);
 6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 30) 
 918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 31) // Looks through the sudoers file and prints out all unique users with sudo permissions
 918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 32) void check_sudoers();
-6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 33) 
-
-
-
-
-void process_file(const filesystem::path &p, set<string> &checked_files, bool called_from_cron = false, std::vector<std::string> *all_checked_paths = nullptr, std::vector<std::string> *writable_paths = nullptr);
-
-
-
-       process_file(etccrontab, checked_files, true);
-
-                process_file(entry.path(), checked_files, true);
-
-                void process_file(const filesystem::path &p, set<string> &checked_files, bool called_from_cron) {
-
-                // Determine if world-writable. Use stat to check others write bit.
-                bool world_writable = false;
-                struct stat st;
-                if (stat(candidate.c_str(), &st) == 0) {
-                    world_writable = (st.st_mode & S_IWOTH) != 0;
-                }
-                // Only report writable when called from cron and file is world-writable.
-                if (called_from_cron && world_writable) {                
-
-
-                     // When called from cron, avoid noisy per-line printing; instead
-            // collect paths in the provided vectors and let the caller decide
-            // what to print. For non-cron callers, keep original behavior.
-            if (!called_from_cron) {
-                cout << p << ":" << linenumber << " -> referencing: " << candidate;
-                if (filesystem::exists(candidate)) {
-                    cout << " (exists) ";
-                    // Determine if world-writable. Use stat to check others write bit.
-                    bool world_writable = false;
-                    struct stat st;
-                    if (stat(candidate.c_str(), &st) == 0) {
-                        world_writable = (st.st_mode & S_IWOTH) != 0;
-                    }
-                    // Only report writable when called from cron and file is world-writable.
-                    if (called_from_cron && world_writable) {
-                        cout << "[WRITABLE]";
-                        if (writable_paths) writable_paths->push_back(candidate);
-                    } else {
-                        cout << "[not writable]";
-                    }
-                    cout << endl;
-                } else {
-                    cout << " (missing)" << endl;
-                }
-            } else {
-                // Cron caller: collect writable paths if world-writable
-                if (filesystem::exists(candidate)) {
-                    struct stat st;
-                    if (stat(candidate.c_str(), &st) == 0) {
-                        if ((st.st_mode & S_IWOTH) != 0) {
-                            if (writable_paths) writable_paths->push_back(candidate);
-                        }
-                    }
-                }
-            }
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 33)             
