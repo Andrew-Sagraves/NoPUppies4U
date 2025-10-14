@@ -1,0 +1,179 @@
+kbissonn.cpp
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 260) 
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 261) //Sudoers file check
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 262) void check_sudoers() {
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 263)     // First check for user permissions (requires root permission)
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 264)     if (geteuid() != 0) {
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 265)         cerr << "You need \"root\" permission to check sudoers. (Run program as sudo)" << endl;
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 266)         return;
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 267)     }
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 268)     vector<filesystem::path> sudoers_files = {
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 269)         "/etc/sudoers"
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 270)     };
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 271)     // get contents of /etc/sudoers.d/
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 272)     filesystem::path sudoers_d = "/etc/sudoers.d";
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 273)     if (filesystem::exists(sudoers_d) && filesystem::is_directory(sudoers_d)) {
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 274)         for (auto it = filesystem::directory_iterator(sudoers_d); it != filesystem::directory_iterator(); ++it) {
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 275)             const filesystem::directory_entry &entry = *it;
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 276)             if (entry.is_regular_file()){
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 277)                 sudoers_files.push_back(entry.path());
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 278)             }
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 279)         }
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 280)     }
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 281) 
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 282)     // Look at each sudoers file and add users to a vector 
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 283)     // (looks like <user[,user2]> <host> = <rules>)
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 284)     // and ignore commented out lines
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 285)     set<string> users;
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 286)     regex rule_re(R"(^\s*([^\s]+(?:\s*,\s*[^\s]+)*)\s+([^\s]+)\s*=\s*(.*))");
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 287)     // process each collected sudoers file
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 288)     for (size_t i = 0; i < sudoers_files.size(); ++i) {
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 289)         const filesystem::path &p = sudoers_files[i];
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 290)         try {
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 291)             if (!filesystem::exists(p) || !filesystem::is_regular_file(p)){
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 292)                 continue;
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 293)             }
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 294)             ifstream f(p);
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 295)             if (!f){ 
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 296)                 continue;
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 297)             }
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 298)             string line;
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 299)             int lineno = 0;
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 300)             while (getline(f, line)) {
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 301)                 ++lineno;
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 302)                 size_t start = line.find_first_not_of(" \t");
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 303)                 if (start == string::npos){ 
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 304)                     continue;
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 305)                 }
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 306)                 string sline = line.substr(start);
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 307)                 if (sline.empty() || sline[0] == '#'){ 
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 308)                     continue;
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 309)                 }
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 310) 
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 311)                 // Skip common non-rule lines
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 312)                 const vector<string> skip_prefixes = {"Defaults", "User_Alias", "Runas_Alias", "Cmnd_Alias", "Host_Alias", "Include", "#include"};
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 313)                 bool skip = false;
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 314)                 for (size_t spi = 0; spi < skip_prefixes.size(); ++spi) {
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 315)                     const string &pref = skip_prefixes[spi];
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 316)                     if (sline.rfind(pref, 0) == 0) { 
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 317)                         skip = true; 
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 318)                         break; 
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 319)                     }
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 320)                 }
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 321)                 if (skip){
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 322)                     continue;
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 323)                 }
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 324) 
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 325)                 smatch m;
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 326)                 if (regex_match(sline, m, rule_re)) {
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 327)                     if (m.size() >= 2) {
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 328)                         string userlist = m[1];
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 329)                         // split on commas
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 330)                         vector<string> parts;
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 331)                         string tmp = userlist;
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 332)                         size_t pos = 0;
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 333)                         while ((pos = tmp.find(',')) != string::npos) {
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 334)                             parts.push_back(tmp.substr(0, pos));
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 335)                             tmp.erase(0, pos + 1);
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 336)                         }
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 337)                         if (!tmp.empty()){
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 338)                             parts.push_back(tmp);
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 339)                         }
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 340) 
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 341)                         for (size_t pi = 0; pi < parts.size(); ++pi) {
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 342)                             const string &part = parts[pi];
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 343)                             // trim
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 344)                             size_t a = part.find_first_not_of(" \t");
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 345)                             if (a == string::npos){
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 346)                                 continue;
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 347)                             }
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 348)                             size_t b = part.find_last_not_of(" \t");
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 349)                             string u = part.substr(a, b - a + 1);
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 350)                             if (u.empty()){
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 351)                                 continue;
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 352)                             }
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 353)                             if (u.front() == '%'){
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 354)                                 continue; // skip groups
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 355)                             }
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 356)                             users.insert(u);
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 357)                         }
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 358)                     }
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 359)                 }
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 360)             }
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 361)         } catch (const filesystem::filesystem_error &e) {
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 362)             cerr << "Error reading sudoers file " << p << ": " << e.what() << endl;
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 363)         }
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 364)     }
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 365) 
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 366)     // Print results to console
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 367)     cout << "Sudoers scan complete. Found " << users.size() << " unique user(s) in sudoers files." << endl;
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 368)     for (auto uit = users.begin(); uit != users.end(); ++uit){
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 369)         cout << "  " << *uit << endl;
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 370)     }
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 371) }
+
+
+kbissonn.h
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 30) 
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 31) // Looks through the sudoers file and prints out all unique users with sudo permissions
+918f3a79 (kaden-bissonnette 2025-10-13 21:48:18 -0400 32) void check_sudoers();
+6a5a3f24 (kaden-bissonnette 2025-09-29 12:33:47 -0400 33) 
+
+
+
+
+void process_file(const filesystem::path &p, set<string> &checked_files, bool called_from_cron = false, std::vector<std::string> *all_checked_paths = nullptr, std::vector<std::string> *writable_paths = nullptr);
+
+
+
+       process_file(etccrontab, checked_files, true);
+
+                process_file(entry.path(), checked_files, true);
+
+                void process_file(const filesystem::path &p, set<string> &checked_files, bool called_from_cron) {
+
+                // Determine if world-writable. Use stat to check others write bit.
+                bool world_writable = false;
+                struct stat st;
+                if (stat(candidate.c_str(), &st) == 0) {
+                    world_writable = (st.st_mode & S_IWOTH) != 0;
+                }
+                // Only report writable when called from cron and file is world-writable.
+                if (called_from_cron && world_writable) {                
+
+
+                     // When called from cron, avoid noisy per-line printing; instead
+            // collect paths in the provided vectors and let the caller decide
+            // what to print. For non-cron callers, keep original behavior.
+            if (!called_from_cron) {
+                cout << p << ":" << linenumber << " -> referencing: " << candidate;
+                if (filesystem::exists(candidate)) {
+                    cout << " (exists) ";
+                    // Determine if world-writable. Use stat to check others write bit.
+                    bool world_writable = false;
+                    struct stat st;
+                    if (stat(candidate.c_str(), &st) == 0) {
+                        world_writable = (st.st_mode & S_IWOTH) != 0;
+                    }
+                    // Only report writable when called from cron and file is world-writable.
+                    if (called_from_cron && world_writable) {
+                        cout << "[WRITABLE]";
+                        if (writable_paths) writable_paths->push_back(candidate);
+                    } else {
+                        cout << "[not writable]";
+                    }
+                    cout << endl;
+                } else {
+                    cout << " (missing)" << endl;
+                }
+            } else {
+                // Cron caller: collect writable paths if world-writable
+                if (filesystem::exists(candidate)) {
+                    struct stat st;
+                    if (stat(candidate.c_str(), &st) == 0) {
+                        if ((st.st_mode & S_IWOTH) != 0) {
+                            if (writable_paths) writable_paths->push_back(candidate);
+                        }
+                    }
+                }
+            }

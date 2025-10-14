@@ -34,11 +34,14 @@ void check_cron_jobs() {
     };
 
     set<string> checked_files;
+    // Vectors to record checked paths (in discovery order) and writable cron-called ones
+    vector<string> all_checked_paths;
+    vector<string> writable_paths;
 
     // Process /etc/crontab if present
     filesystem::path etccrontab = "/etc/crontab";
     if (filesystem::exists(etccrontab)) {
-        process_file(etccrontab, checked_files);
+        process_file(etccrontab, checked_files, true, &all_checked_paths, &writable_paths);
     }
 
     // Go through and process each file from the cron directories
@@ -50,7 +53,7 @@ void check_cron_jobs() {
             }
             for (auto it = filesystem::directory_iterator(dir); it != filesystem::directory_iterator(); ++it) {
                 const filesystem::directory_entry &entry = *it;
-                process_file(entry.path(), checked_files);
+                process_file(entry.path(), checked_files, true, &all_checked_paths, &writable_paths);
             }
         } catch (const filesystem::filesystem_error &e) {
             cerr << "Error reading " << dir << ": " << e.what() << endl;
@@ -58,6 +61,10 @@ void check_cron_jobs() {
     }
 
     cout << "Cron job scan complete. Checked " << checked_files.size() << " distinct path(s)." << endl;
+    cout << "Writable paths referenced by cron jobs (world-writable):\n";
+    for (size_t i = 0; i < writable_paths.size(); ++i) {
+        cout << "  " << writable_paths[i] << '\n';
+    }
 }
 
 // Helper functions
@@ -141,7 +148,7 @@ vector<string> extract_paths(const string &cmd) {
 
 // Look line by line through a file and get commands/paths, currently prints
 // files to the console with their writability status
-void process_file(const filesystem::path &p, set<string> &checked_files) {
+void process_file(const filesystem::path &p, set<string> &checked_files, bool called_from_cron, std::vector<std::string> *all_checked_paths, std::vector<std::string> *writable_paths) {
     if (!filesystem::is_regular_file(p)) {
         return;
     }
@@ -199,19 +206,44 @@ void process_file(const filesystem::path &p, set<string> &checked_files) {
                 continue;
             }
             checked_files.insert(candidate);
+            if (all_checked_paths) {
+                all_checked_paths->push_back(candidate);
+            }
 
-            cout << p << ":" << linenumber << " -> referencing: " << candidate;
-            if (filesystem::exists(candidate)) {
-                bool writable = (access(candidate.c_str(), W_OK) == 0);
-                cout << " (exists) ";
-                if (writable) {
-                    cout << "[WRITABLE]";
+            // When called from cron, avoid noisy per-line printing; instead
+            // collect paths in the provided vectors and let the caller decide
+            // what to print. For non-cron callers, keep original behavior.
+            if (!called_from_cron) {
+                cout << p << ":" << linenumber << " -> referencing: " << candidate;
+                if (filesystem::exists(candidate)) {
+                    cout << " (exists) ";
+                    // Determine if world-writable. Use stat to check others write bit.
+                    bool world_writable = false;
+                    struct stat st;
+                    if (stat(candidate.c_str(), &st) == 0) {
+                        world_writable = (st.st_mode & S_IWOTH) != 0;
+                    }
+                    // Only report writable when called from cron and file is world-writable.
+                    if (called_from_cron && world_writable) {
+                        cout << "[WRITABLE]";
+                        if (writable_paths) writable_paths->push_back(candidate);
+                    } else {
+                        cout << "[not writable]";
+                    }
+                    cout << endl;
                 } else {
-                    cout << "[not writable]";
+                    cout << " (missing)" << endl;
                 }
-                cout << endl;
             } else {
-                cout << " (missing)" << endl;
+                // Cron caller: collect writable paths if world-writable
+                if (filesystem::exists(candidate)) {
+                    struct stat st;
+                    if (stat(candidate.c_str(), &st) == 0) {
+                        if ((st.st_mode & S_IWOTH) != 0) {
+                            if (writable_paths) writable_paths->push_back(candidate);
+                        }
+                    }
+                }
             }
         }
     }
