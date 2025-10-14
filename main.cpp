@@ -21,6 +21,7 @@ int main(int argc, char* argv[]) {
 		- Check to see if argv[i] is a valid --(command)
 		- If (command) requires input, check argv[i + 1] for valid input. If so, increment i to skip it for next, and process it, otherwise, error? 
 		- Goal: have it always either work or fail. No unexpected states 
+
 		
 		-p for path
 		-c for crontab
