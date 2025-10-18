@@ -12,7 +12,7 @@ void check_sys_updated();
 // checking firewall of system
 void check_ufw();
 // setting up Network Intrusion Detection system
-//void check_snort();
-// checking for ncat backdoor
-// void ncat_backdoor();
+// void check_snort();
+// checking for ncat backdoor both 'nc' and 'ncat'
+void ncat_backdoor();
 #endif

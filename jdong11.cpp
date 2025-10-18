@@ -6,6 +6,7 @@
 #include <vector>
 #include <sstream>
 #include <limits>
+#include <regex>
 
 using namespace std;
 
@@ -294,17 +295,40 @@ void ufwHelpPrint() {
     << "sending DNS queries to 8.8.8.8" << endl;
 }
 
-void ufwWriteTemplMode(string &filter, string &trafDir, string &source, string &dest, string &port, string &proto) {
+// Add this helper function before ufwWriteTemplMode
+bool isValidIP(const string& ip) {
+    if (ip == "any") return true;  // Allow "any" as valid
+    
+    regex ipPattern("^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$");
+    return regex_match(ip, ipPattern);
+}
+
+void ufwWriteTemplMode(string &filter, string &trafDir, string &source, string &dest, int &port, string &proto) {
     bool back = false;
+    bool errorMode = false;
     string input;
 
     // add error checking later!!!
     while (!back) {
         // first input takes in what 1 of the 6 to fill
-        cout << "WriteTempMode> ";
+        cout << "? - get help" << endl;
+        cout << "WriteTemplMode> ";
         cin >> input;
         cout << endl;
         switch (input[0]) {
+            case '?': 
+                cout << "Invalid Input (Usage): " << endl
+                << "a - allow:                          allow traffic though firewall" << endl
+                << "d - deny:                           deny traffic through firewall (silently drop)" << endl
+                << "r - reject:                         deny packets though firewall (send back RST)" << endl
+                << "c - limit:                          allows traffic with rate-limit connections (cap)" << endl
+                << "i - in:                             inbound traffic" << endl
+                << "o - out:                            outbound traffic" << endl
+                << "s [IP] - source [IP]:               source ip (origin of traffic) [IPv4]" << endl
+                << "t [IP] - destination [IP]:          target destination ip (where packets end up) [IPv4]" << endl
+                << "p [1-65535] - port [1-65535]:       destination port" << endl
+                << "f [tcp/udp] - proto[tcp/ufp]:       protocol of traffic (format)" << endl << endl;
+                break;
             case 'b': 
                 back = true;
                 break;
@@ -335,16 +359,107 @@ void ufwWriteTemplMode(string &filter, string &trafDir, string &source, string &
                 trafDir = "out";
                 break;
             case 's':
-                cin >> source;
+                do {
+                    errorMode = false;
+                    string tmpSource;
+                    cout << "\'0\' - Exit error mode" << endl;
+                    cout << "(ErrorMode) Source IP (or \'any\'): > ";
+                    cin >> tmpSource;
+                    cout << endl;
+
+                    if (tmpSource == "0") {
+                        cout << "exiting..." << endl;
+                        break;
+                    }
+
+                    // error checking for invalid sources
+                    if (!isValidIP(tmpSource)) {
+                        cout << "Invalid IP address format" << endl;
+                        cout << "Usage: x.x.x.x or \'any\'" << endl;
+                        errorMode = true;
+                    }
+                    else {
+                        source = tmpSource;
+                    }
+                } while (errorMode);
                 break;
             case 't':
-                cin >> dest;
+                do {
+                    errorMode = false;
+                    string tmpDest;
+                    cout << "\'0\' - Exit error mode" << endl;
+                    cout << "(ErrorMode) Target/Destination IP (or \'any\'): > ";
+                    cin >> tmpDest;
+                    cout << endl;
+
+                    if (tmpDest == "0") {
+                        cout << "exiting..." << endl;
+                        break;
+                    }
+
+                    // error checking for invalid sources
+                    if (!isValidIP(tmpDest)) {
+                        cout << "Invalid IP address format" << endl;
+                        cout << "Usage: x.x.x.x or \'any\'" << endl;
+                        errorMode = true;
+                    }
+                    else {
+                        dest = tmpDest;
+                    }
+                } while (errorMode);
                 break;
             case 'p': 
-                cin >> port;
+                do {
+                    errorMode = false;
+                    int tmpPort = -1;
+                    cout << "\'0\' - Exit error mode" << endl;
+                    cout << "(ErrorMode) Port: > ";
+                    cin >> tmpPort;
+                    cout << endl;
+                    
+                    if (tmpPort == 0) {
+                        cout << "exiting... " << endl;
+                        break;
+                    }
+                    // error checking for invalid inputs
+                    if (cin.fail() || tmpPort < 1 || tmpPort > 65535) {
+                        cout << "Invalid Input: " << endl;
+                        cout << "Port usage: p [1-65535]" << endl;
+                        errorMode = true;
+                    
+                        // Clear error state
+                        cin.clear();
+                        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+                    }
+                    else {
+                        port = tmpPort;
+                    }
+                } while (errorMode);
                 break;
             case 'f':
-                cin >> proto;
+                do {
+                    errorMode = false;
+                    string tmpProto;
+                    cout << "\'0\' - Exit errorMode" << endl;
+                    cout << "(ErrorMode) Protocol: > ";
+                    cin >> tmpProto;
+                    cout << endl;
+
+                    if (tmpProto == "0") {
+                        cout << "exiting... " << endl;
+                        break;
+                    }
+
+                    // error checking for invalid inputs
+                    if (tmpProto != "udp" && tmpProto != "tcp") {
+                        cout << "Invalid Input:" << endl;
+                        cout << "Format/Protocol usage: f tcp/udp" << endl;
+                        errorMode = true;
+                    }
+                    else {
+                        proto = tmpProto;
+                    }
+                } while (errorMode);
                 break;
             default:
                 cout << "Invalid Input (Usage): " << endl
@@ -400,7 +515,7 @@ void check_ufw() {
     file.close();
 
     system("ufw status");
-    cout << "? - for help" << endl << endl;
+    cout << endl << "? - get help" << endl;
 
     while (!continueSig) {
         cout << "Main Menu(ufw)> ";
@@ -412,10 +527,10 @@ void check_ufw() {
             case '?': 
                 cout << "Enter \'y\' to enable, " << endl;
                 cout << "enter \'n\' to disable, " << endl;
-                cout << "enter \'r\' to reset," << endl;
+                cout << "enter \'r\' to reset all rules," << endl;
                 cout << "enter \'l\' to list rules, " << endl;
-                cout << "enter \'a\' to add rule, " << endl;
-                cout << "enter \'d\' to delete rule, " << endl;
+                cout << "enter \'a\' to add rules, " << endl;
+                cout << "enter \'d\' to delete rules, " << endl;
                 cout << "enter \'c\' to continue." << endl;
                 break;
             case 'y':
@@ -438,7 +553,7 @@ void check_ufw() {
                 string trafDir = "in";
                 string source = "any";
                 string dest = "any";
-                string port = "22";
+                int port = 22;
                 string proto = "tcp";
                 bool back = false;
 
@@ -471,11 +586,11 @@ void check_ufw() {
                             trafDir = "";
                             source = "any";
                             dest = "any";
-                            port = "";
+                            port = -1;
                             proto = "tcp";
                             break;
                         case 'p':
-                            cout << "Filter: " << filter << endl;
+                            cout << endl << "Filter: " << filter << endl;
                             cout << "Traffic Direction: " << trafDir << endl;
                             cout << "Source IP: " << source << endl;
                             cout << "Destination IP: " << dest << endl;
@@ -566,4 +681,70 @@ void check_ufw() {
     cout << endl << endl;
 
     system("rm ufwtmpFile.txt");
+}
+
+bool isReverseShell(const string& psLine) {
+    // Split the line into fields
+    regex suspicious_patterns[] = {
+        regex("nc.*-[lve].*"),              // netcat with flags
+        regex("ncat.*-[lve].*"),            // nmap netcat
+        regex(".*-e.*/bin/(bash|sh)"),      // execute shell
+        regex("bash.*-i"),                  // interactive bash
+        regex("python.*-c.*socket"),        // python reverse shell
+        regex("perl.*-e.*socket"),          // perl reverse shell
+    };
+
+    int size = sizeof(suspicious_patterns) / sizeof(suspicious_patterns[0]);
+    for (int i = 0; i < size; i++) {
+        if (psLine.find("code") != string::npos) {
+            return false;
+        }
+        if (regex_search(psLine, suspicious_patterns[i])) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void ncat_backdoor() {
+    // first check for user permissions: require root permission
+    if (geteuid() != 0) {
+        cerr << "You need \"root\" permission to check /etc/apt/sources.list" << endl;
+        return;
+    }
+
+    system("ps aux > ncattmpfile.txt");
+
+    ifstream file("ncattmpfile.txt");
+    if (file.fail()) {
+        cerr << "File failed to open." << endl << endl;
+        file.close();
+        return;
+    }
+
+    string buffer;
+    vector<string> flag;
+
+    cout << "Scanning processes for reverse shell..." << endl;
+    
+    while (getline(file, buffer)) {
+        if (isReverseShell(buffer)) {
+            flag.push_back(buffer);
+        }
+    }
+    
+    if (!flag.empty()) {
+        cout << "These commands are flagged for being suspected reverse shell:" << endl;
+        for (size_t i = 0; i < flag.size(); i++) {
+            cout << flag[i] << endl;
+        }
+    }
+    else {
+        cout << "No suspicious reverse shell process found. < __ >" << endl;
+    }
+
+    cout << endl;
+
+    file.close();
+    system("rm ncattmpfile.txt");
 }
