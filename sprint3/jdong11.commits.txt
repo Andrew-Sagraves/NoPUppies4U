@@ -1,0 +1,773 @@
+jdong11.cpp
+
+2ad3bad6 (Jason Dong 2025-09-19 20:47:39 -0400   1) #include "jdong11.h"
+2ad3bad6 (Jason Dong 2025-09-19 20:47:39 -0400   2) #include <iostream>
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400   3) #include <fstream>
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400   4) #include <unistd.h>
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400   5) #include <stdlib.h>
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400   6) #include <vector>
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400   7) #include <sstream>
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400   8) #include <limits>
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400   9) #include <regex>
+2ad3bad6 (Jason Dong 2025-09-19 20:47:39 -0400  10) 
+2ad3bad6 (Jason Dong 2025-09-19 20:47:39 -0400  11) using namespace std;
+2ad3bad6 (Jason Dong 2025-09-19 20:47:39 -0400  12) 
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400  13) // checks /etc/apt/sources.list if Ubuntu <22.04
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400  14) // checks /etc/apt/sources.list.d/ubuntu.sources if Ubuntu >=22.04
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400  15) 
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400  16) /*
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400  17)     Area of improvement: Allow user to add their own known list of URLs
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400  18) */
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400  19) 
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  20) void check_sources_list() {
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  21)     // first check for user permissions: require root permission
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  22)     if (geteuid() != 0) {
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  23)         cerr << "You need \"root\" permission to check /etc/apt/sources.list" << endl;
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  24)         return;
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  25)     }
+2ad3bad6 (Jason Dong 2025-09-19 20:47:39 -0400  26) 
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  27)     // open file and error checking the file
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  28)     ifstream file("/etc/apt/sources.list");
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  29)     if (file.fail()) {
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  30)         cerr << "/etc/apt/sources.list failed to open." << endl;
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  31)         file.close();
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  32)         return;
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  33)     }
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  34)     
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  35)     // reading from file and checking if valid
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  36)     printf("Checking /etc/apt/sources.list...\n");
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  37)     
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  38)     string line; 
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  39)     int numUnknownSources = 0;
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  40)     vector<string> sources;
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  41)     bool deb822Format = false;
+2ad3bad6 (Jason Dong 2025-09-19 20:47:39 -0400  42) 
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400  43)     // checking for urls in sources.list and push into vector
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  44)     while (getline(file, line)) {
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  45)         if (line.find("http") != string::npos) {
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  46)             if (line[0] == '#') {   // skip commented lines
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  47)                 continue; 
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  48)             }
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  49)             sources.push_back(line);
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  50)         }
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  51)     }
+2ad3bad6 (Jason Dong 2025-09-19 20:47:39 -0400  52) 
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400  53)     // parse the /etc/apt/sources.list file again line by line for deb822 which means the actual sources are in a different path Ubuntu 22.04+
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400  54)     file.clear();
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400  55)     file.seekg(0, ios::beg);
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  56)     while (getline(file, line)) {
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  57)         if (line.find("deb822") != string::npos) {
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  58)             cout << "Found deb822 format, switching to ubuntu.sources file..." << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400  59)             file.clear(); // clear any error flags
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  60)             file.close();
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  61)             file.open("/etc/apt/sources.list.d/ubuntu.sources");
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400  62)             file.seekg(0, ios::beg); // reset file pointer to beginning
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  63)             if (file.fail()) {
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  64)                 cerr << "/etc/apt/sources.list.d/ubuntu.sources failed to open." << endl;
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  65)                 return;
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  66)             }
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  67)             deb822Format = true;
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  68)             break; 
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  69)         }
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  70)     }
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  71) 
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  72)     // If switched to deb822 format, check new file for URIs
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  73)     if (deb822Format) {
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  74)         cout << "Checking /etc/apt/sources.list.d/ubuntu.sources file..." << endl;
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  75)         while (getline(file, line)) {
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  76)             if (line.find("http") != string::npos) {
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  77)                 if (line[0] == '#') {
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  78)                     continue;
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  79)                 }
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  80)                 sources.push_back(line);
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  81)             }
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  82)         }
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  83)     }
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  84) 
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  85)     // Print out the unknown sources
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400  86)     cout << sources.size() << " total sources found..." << endl;
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400  87)     for (size_t i = 0; i < sources.size(); i++) {
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  88)         if (!deb822Format) {
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  89)             // Check if it's not one of the valid Ubuntu sources with sources.list format
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  90)             if (
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  91)                 sources[i].find("deb http://archive.ubuntu.com/ubuntu/") == string::npos &&
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  92)                 sources[i].find("deb http://security.ubuntu.com/ubuntu/") == string::npos &&
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  93)                 sources[i].find("deb-src http://archive.ubuntu.com/ubuntu/") == string::npos && 
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  94)                 sources[i].find("deb-src http://security.ubuntu.com/ubuntu/") == string::npos &&
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  95)                 sources[i].find("deb http://archive.canonical.com/ubuntu") == string::npos &&
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  96)                 sources[i].find("deb-src http://archive.canonical.com/ubuntu") == string::npos
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  97)                 ) {
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  98)                 cout << "Unknown source found: " << sources[i] << endl;
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400  99)                 numUnknownSources += 1;
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400 100)             }
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400 101)         }
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400 102)         // Check if it's not one of the valid Ubuntu sources with deb822 format
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400 103)         else {
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400 104)             if (
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400 105)                 sources[i].find("http://archive.ubuntu.com/ubuntu/") == string::npos &&
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400 106)                 sources[i].find("http://security.ubuntu.com/ubuntu/") == string::npos &&
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400 107)                 sources[i].find("http://archive.canonical.com/ubuntu") == string::npos &&
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400 108)                 sources[i].find("http://help.ubuntu.com/community/UpgradeNotes") == string::npos
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400 109)                 ) {
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400 110)                 cout << "Unknown source found: " << sources[i] << endl;
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400 111)                 numUnknownSources += 1;
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400 112)             }
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400 113)         }
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400 114)     }
+2ad3bad6 (Jason Dong 2025-09-19 20:47:39 -0400 115) 
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400 116)     file.close();
+940b9a08 (Jason Dong 2025-09-23 20:46:00 -0400 117)     cout << "!!! Num Unknown sources: " << numUnknownSources << " ^^^" << endl << endl;
+d81bf36d (Jason Dong 2025-09-22 18:07:30 -0400 118) }
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 119) 
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 120) // checks /etc/group for users in sudo group
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 121) void check_sudo() {
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 122)     // first check for user permissions: require root permission
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 123)     if (geteuid() != 0) {
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 124)         cerr << "You need \"root\" permission to check /etc/apt/sources.list" << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 125)         return;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 126)     }
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 127) 
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 128)     // Open /etc/group file to check sudo group members
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 129)     ifstream file("/etc/group");
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 130)     if (file.fail()) {
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 131)         cerr << "/etc/group failed to open." << endl;
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 132)         return;
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 133)     }
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 134) 
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 135)     string line;
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 136)     stringstream sin;
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 137)     string user;
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 138)     bool comma = true;
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 139)     
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 140)     printf("Checking /etc/group for sudo users...\n");
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 141) 
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 142)     // reads each line in file
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 143)     while (getline(file, line)) {
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 144)         if (line.find("sudo:") != string::npos) {
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 145)             // gets skips sudo:x:27:
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 146)             line = line.substr(line.find(":") + 1); 
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 147)             line = line.substr(line.find(":") + 1);
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 148)             line = line.substr(line.find(":") + 1);
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 149)             
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 150)             // put line into stringstream for parsing
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 151)             sin.str(line);
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 152)             sin.clear();
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 153)             
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 154)             // parsing the comma-separated list of users into terminal
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 155)             cout << "!!! Users in sudo group: ";
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 156)             while (getline(sin, user, ',')) {
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 157)                 if (comma) {
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 158)                     cout << user;
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 159)                     comma = false;
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 160)                 }
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 161)                 else {
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 162)                     cout << ", " << user;
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 163)                 }
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 164)             }
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 165)             cout << endl << endl;
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 166)         }
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 167)     }
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 168)     file.close();    
+17ebed1f (Jason Dong 2025-09-23 21:00:38 -0400 169) }
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 170) 
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 171) // Check system if it is up to date
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 172) void check_sys_updated() {
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 173)     // first check for user permissions: require root permission
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 174)     if (geteuid() != 0) {
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 175)         cerr << "You need \"root\" permission to check /etc/apt/sources.list" << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 176)         return;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 177)     }
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 178) 
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 179)     printf("Checking if system is up to date...\n");
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 180)     system("mkdir -p /var/log/NoPUppies4U");
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 181)     system("apt update --quiet --assume-yes >/var/log/NoPUppies4U/update.log");
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 182)     system("apt list --upgradable > /var/log/NoPUppies4U/upgradable.log");
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 183) 
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 184)     string buffer;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 185)     string userInput;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 186)     bool updateSignal = false;      // true if system is not up to date
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 187)     bool updated = false;           // true if user chose to update system
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 188)     ifstream file("/var/log/NoPUppies4U/update.log");
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 189) 
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 190)     //error checking file
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 191)     if (file.fail()) {
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 192)         cerr << "/var/log/NoPUppies4U/update.log failed to open." << endl;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 193)         return;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 194)     }
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 195)     
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 196)     // parse through each line of update.log
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 197)     while (getline(file, buffer)) {
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 198)         if (buffer.find("All packages are up to date.") != string::npos) {
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 199)             cout << "!!! System is up to date ♡⸜(˶˃ ᵕ ˂˶)⸝♡" << endl << endl;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 200)             file.close();
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 201)             return;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 202)         }
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 203)         else if (buffer.find("packages can be upgraded.") != string::npos || buffer.find("package can be upgraded.") != string::npos) {
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 204)             cout << "System is >NOT< up to date." << endl;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 205)             updateSignal = true;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 206)         }
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 207)     }
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 208) 
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 209)     // if system is not up to date, prompt user to upgrade now, skip upgrade, or list upgradable packages
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 210)     while (updateSignal) {
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 211)         userInput.clear();
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 212)         cout << "Enter \'n\' to skip upgrade. Enter \'y\' to upgrade now. Enter \'l\' to list packages upgradable list: > ";
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 213)         cin >> userInput;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 214) 
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 215)         switch(userInput[0]) {
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 216)             case 'y': 
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 217)                 cout << "Upgrading system now..." << endl;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 218)                 system("apt upgrade --quiet --assume-yes >/var/log/NoPUppies4U/upgrade.log 2>/var/log/NoPUppies4U/error.log");
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 219)                 cout << "System upgrade complete. Check /var/log/NoPUppies4U/upgrade.log for details." << endl;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 220)                 updated = true;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 221)                 updateSignal = false;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 222)                 break;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 223)             case 'n': 
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 224)                 updateSignal = false;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 225)                 break;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 226)             case 'l':
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 227)                 system("apt list --upgradable");
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 228)                 break;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 229)             default: 
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 230)                 cerr << "Invalid input. Please enter \'y\', \'n\', or \'l\'. (╯°□°）╯︵ ~┻━┻" << endl;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 231)                 break;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 232)         }
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 233)     }
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 234) 
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 235)     // checking for errors in error.log if system was updated
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 236)     if (updated) {
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 237)         ifstream errorFile("/var/log/NoPUppies4U/error.log");
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 238) 
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 239)         // error checking error.log file
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 240)         if (errorFile.fail()) {
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 241)             cerr << "/var/log/NoPUppies4U/error.log failed to open." << endl;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 242)             return;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 243)         }
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 244)         if (errorFile.peek() == ifstream::traits_type::eof() ) {
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 245)             cout << "No errors found..." << endl;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 246)         }
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 247)         else {
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 248)             cout << "Errors occurred during update. Check /var/log/NoPUppies4U/error.log for details." << endl;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 249)         }
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 250)         errorFile.close();
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 251)     }
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 252) 
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 253)     cout << "All logs are in /var/log/NoPUppies4U/ ദ്ദി(｡•̀ ,<)~✩‧₊" << endl << endl;
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 254) 
+b35882db (Jason Dong 2025-09-28 12:27:13 -0400 255)     file.close();
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 256) }
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 257) 
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 258) // This function is a helper function for ufw_check().
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 259) // This function prints out instructions on how to use ufw_check().
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 260) void ufwHelpPrint() {
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 261)     cout << endl;
+9a406970 (Jason Dong 2025-10-12 16:18:30 -0400 262)     cout << "Add Rule Mode Usage: " << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 263)     cout << "\'?\'      - help" << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 264)     cout << "\'l\'      - list current rules" << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 265)     cout << "\'b\'      - go back to menu" << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 266)     cout << "\'r\'      - reset template to default" << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 267)     cout << "\'p\'      - print current template" << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 268)     cout << "\'w\'      - enter Write Mode on template" << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 269)     cout << "\'a\'      - add rule based on current template" << endl << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 270) 
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 271)     cout << "Write Mode Usage: " << endl
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 272)     << "To add rule, fill in the template (6 total to fill)" << endl
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 273)     << "template: [allow|deny|reject|limit] [in|out] from [source] to [destination] [port#] proto [tcp|udp]" << endl
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 274)     << "Use \'any\' for \'source\' or \'destination\' for any ip address." << endl << endl
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 275) 
+9a406970 (Jason Dong 2025-10-12 16:18:30 -0400 276)     << "\'b\' - exiting write mode" << endl
+9a406970 (Jason Dong 2025-10-12 16:18:30 -0400 277)     << "\'l\' - list current template rules" << endl << endl
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 278) 
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 279)     << "modifying template \'writing mode (w)\'" << endl
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 280)     << "a - allow:                          allow traffic though firewall" << endl
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 281)     << "d - deny:                           deny traffic through firewall (silently drop)" << endl
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 282)     << "r - reject:                         deny packets though firewall (send back RST)" << endl
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 283)     << "c - limit:                          allows traffic with rate-limit connections (cap)" << endl
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 284)     << "i - in:                             inbound traffic" << endl
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 285)     << "o - out:                            outbound traffic" << endl
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 286)     << "s [IP] - source [IP]:               source ip (origin of traffic) [IPv4]" << endl
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 287)     << "t [IP] - destination [IP]:          target destination ip (where packets end up) [IPv4]" << endl
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 288)     << "p [1-65535] - port [1-65535]:       destination port" << endl
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 289)     << "f [tcp/udp] - proto[tcp/ufp]:       protocol of traffic (format)" << endl << endl
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 290) 
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 291)     << "Example Usage of Write Mode: " << endl
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 292)     << "1.) allow in from any to any 22 proto tcp: this allows ssh in"
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 293)     << "(any host on the internet can connect to this machine via ssh)" << endl
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 294)     << "2.) deny out from any to 8.8.8.8 port 53 proto udp: prevent host from"
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 295)     << "sending DNS queries to 8.8.8.8" << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 296) }
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 297) 
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 298) // Add this helper function before ufwWriteTemplMode
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 299) bool isValidIP(const string& ip) {
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 300)     if (ip == "any") return true;  // Allow "any" as valid
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 301)     
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 302)     regex ipPattern("^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$");
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 303)     return regex_match(ip, ipPattern);
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 304) }
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 305) 
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 306) void ufwWriteTemplMode(string &filter, string &trafDir, string &source, string &dest, int &port, string &proto) {
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 307)     bool back = false;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 308)     bool errorMode = false;
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 309)     string input;
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 310) 
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 311)     // add error checking later!!!
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 312)     while (!back) {
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 313)         // first input takes in what 1 of the 6 to fill
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 314)         cout << "? - get help" << endl;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 315)         cout << "WriteTemplMode> ";
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 316)         cin >> input;
+9a406970 (Jason Dong 2025-10-12 16:18:30 -0400 317)         cout << endl;
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 318)         switch (input[0]) {
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 319)             case '?': 
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 320)                 cout << "Invalid Input (Usage): " << endl
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 321)                 << "a - allow:                          allow traffic though firewall" << endl
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 322)                 << "d - deny:                           deny traffic through firewall (silently drop)" << endl
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 323)                 << "r - reject:                         deny packets though firewall (send back RST)" << endl
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 324)                 << "c - limit:                          allows traffic with rate-limit connections (cap)" << endl
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 325)                 << "i - in:                             inbound traffic" << endl
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 326)                 << "o - out:                            outbound traffic" << endl
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 327)                 << "s [IP] - source [IP]:               source ip (origin of traffic) [IPv4]" << endl
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 328)                 << "t [IP] - destination [IP]:          target destination ip (where packets end up) [IPv4]" << endl
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 329)                 << "p [1-65535] - port [1-65535]:       destination port" << endl
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 330)                 << "f [tcp/udp] - proto[tcp/ufp]:       protocol of traffic (format)" << endl << endl;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 331)                 break;
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 332)             case 'b': 
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 333)                 back = true;
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 334)                 break;
+9a406970 (Jason Dong 2025-10-12 16:18:30 -0400 335)             case 'l': 
+9a406970 (Jason Dong 2025-10-12 16:18:30 -0400 336)                 cout << "Filter: " << filter << endl;
+9a406970 (Jason Dong 2025-10-12 16:18:30 -0400 337)                 cout << "Traffic Direction: " << trafDir << endl;
+9a406970 (Jason Dong 2025-10-12 16:18:30 -0400 338)                 cout << "Source IP: " << source << endl;
+9a406970 (Jason Dong 2025-10-12 16:18:30 -0400 339)                 cout << "Destination IP: " << dest << endl;
+9a406970 (Jason Dong 2025-10-12 16:18:30 -0400 340)                 cout << "Destination port: " << port << endl;
+9a406970 (Jason Dong 2025-10-12 16:18:30 -0400 341)                 cout << "Protocol: " << proto << endl << endl;
+9a406970 (Jason Dong 2025-10-12 16:18:30 -0400 342)                 break;
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 343)             case 'a':
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 344)                 filter = "allow";
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 345)                 break;
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 346)             case 'd':
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 347)                 filter = "deny";
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 348)                 break;
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 349)             case 'r':
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 350)                 filter = "reject";
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 351)                 break;
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 352)             case 'c':
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 353)                 filter = "limit";
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 354)                 break;
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 355)             case 'i':
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 356)                 trafDir = "in";
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 357)                 break;
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 358)             case 'o':
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 359)                 trafDir = "out";
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 360)                 break;
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 361)             case 's':
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 362)                 do {
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 363)                     errorMode = false;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 364)                     string tmpSource;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 365)                     cout << "\'0\' - Exit error mode" << endl;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 366)                     cout << "(ErrorMode) Source IP (or \'any\'): > ";
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 367)                     cin >> tmpSource;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 368)                     cout << endl;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 369) 
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 370)                     if (tmpSource == "0") {
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 371)                         cout << "exiting..." << endl;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 372)                         break;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 373)                     }
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 374) 
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 375)                     // error checking for invalid sources
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 376)                     if (!isValidIP(tmpSource)) {
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 377)                         cout << "Invalid IP address format" << endl;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 378)                         cout << "Usage: x.x.x.x or \'any\'" << endl;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 379)                         errorMode = true;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 380)                     }
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 381)                     else {
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 382)                         source = tmpSource;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 383)                     }
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 384)                 } while (errorMode);
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 385)                 break;
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 386)             case 't':
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 387)                 do {
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 388)                     errorMode = false;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 389)                     string tmpDest;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 390)                     cout << "\'0\' - Exit error mode" << endl;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 391)                     cout << "(ErrorMode) Target/Destination IP (or \'any\'): > ";
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 392)                     cin >> tmpDest;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 393)                     cout << endl;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 394) 
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 395)                     if (tmpDest == "0") {
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 396)                         cout << "exiting..." << endl;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 397)                         break;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 398)                     }
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 399) 
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 400)                     // error checking for invalid sources
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 401)                     if (!isValidIP(tmpDest)) {
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 402)                         cout << "Invalid IP address format" << endl;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 403)                         cout << "Usage: x.x.x.x or \'any\'" << endl;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 404)                         errorMode = true;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 405)                     }
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 406)                     else {
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 407)                         dest = tmpDest;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 408)                     }
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 409)                 } while (errorMode);
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 410)                 break;
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 411)             case 'p': 
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 412)                 do {
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 413)                     errorMode = false;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 414)                     int tmpPort = -1;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 415)                     cout << "\'0\' - Exit error mode" << endl;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 416)                     cout << "(ErrorMode) Port: > ";
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 417)                     cin >> tmpPort;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 418)                     cout << endl;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 419)                     
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 420)                     if (tmpPort == 0) {
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 421)                         cout << "exiting... " << endl;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 422)                         break;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 423)                     }
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 424)                     // error checking for invalid inputs
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 425)                     if (cin.fail() || tmpPort < 1 || tmpPort > 65535) {
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 426)                         cout << "Invalid Input: " << endl;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 427)                         cout << "Port usage: p [1-65535]" << endl;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 428)                         errorMode = true;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 429)                     
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 430)                         // Clear error state
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 431)                         cin.clear();
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 432)                         cin.ignore(numeric_limits<streamsize>::max(), '\n');
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 433)                     }
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 434)                     else {
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 435)                         port = tmpPort;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 436)                     }
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 437)                 } while (errorMode);
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 438)                 break;
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 439)             case 'f':
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 440)                 do {
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 441)                     errorMode = false;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 442)                     string tmpProto;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 443)                     cout << "\'0\' - Exit errorMode" << endl;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 444)                     cout << "(ErrorMode) Protocol: > ";
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 445)                     cin >> tmpProto;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 446)                     cout << endl;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 447) 
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 448)                     if (tmpProto == "0") {
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 449)                         cout << "exiting... " << endl;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 450)                         break;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 451)                     }
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 452) 
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 453)                     // error checking for invalid inputs
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 454)                     if (tmpProto != "udp" && tmpProto != "tcp") {
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 455)                         cout << "Invalid Input:" << endl;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 456)                         cout << "Format/Protocol usage: f tcp/udp" << endl;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 457)                         errorMode = true;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 458)                     }
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 459)                     else {
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 460)                         proto = tmpProto;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 461)                     }
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 462)                 } while (errorMode);
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 463)                 break;
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 464)             default:
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 465)                 cout << "Invalid Input (Usage): " << endl
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 466)                      << "a - allow:                          allow traffic though firewall" << endl
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 467)                      << "d - deny:                           deny traffic through firewall (silently drop)" << endl
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 468)                      << "r - reject:                         deny packets though firewall (send back RST)" << endl
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 469)                      << "c - limit:                          allows traffic with rate-limit connections (cap)" << endl
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 470)                      << "i - in:                             inbound traffic" << endl
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 471)                      << "o - out:                            outbound traffic" << endl
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 472)                      << "s [IP] - source [IP]:               source ip (origin of traffic) [IPv4]" << endl
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 473)                      << "t [IP] - destination [IP]:          target destination ip (where packets end up) [IPv4]" << endl
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 474)                      << "p [1-65535] - port [1-65535]:       destination port" << endl
+9a406970 (Jason Dong 2025-10-12 16:18:30 -0400 475)                      << "f [tcp/udp] - proto[tcp/ufp]:       protocol of traffic (format)" << endl << endl;
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 476)                 break;
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 477)         }
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 478)     }
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 479) }
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 480) 
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 481) // check the Uncomplicated Firewall status
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 482) void check_ufw() {
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 483)     // first check for user permissions: require root permission
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 484)     if (geteuid() != 0) {
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 485)         cerr << "You need \"root\" permission to check /etc/apt/sources.list" << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 486)         return;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 487)     }
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 488) 
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 489)     system("apt list --installed | grep ufw > ufwtmpFile.txt");
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 490) 
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 491)     ifstream file("ufwtmpFile.txt");
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 492)     if (file.fail()) {
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 493)         cerr << "File failed" << endl << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 494)         file.close();
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 495)         return;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 496)     }
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 497) 
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 498)     string line;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 499)     string status;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 500)     string input;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 501)     bool continueSig = false;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 502) 
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 503)     cout << "Checking firewall (UFW - Uncomplicated Firewall)..." << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 504) 
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 505)     // Initialization for ufw
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 506)     getline(file, line);
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 507)     if (line.find("ufw") != string::npos) {
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 508)         cout << "UFW installation found. - _ -" << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 509)     }
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 510)     else {
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 511)         system("apt --quiet --assume-yes install ufw");
+2475e1e9 (Jason Dong 2025-10-12 16:51:10 -0400 512)         // !!! Quality of life add: ask if enable firewall here...
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 513)     }
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 514)     file.clear();
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 515)     file.close();
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 516) 
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 517)     system("ufw status");
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 518)     cout << endl << "? - get help" << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 519) 
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 520)     while (!continueSig) {
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 521)         cout << "Main Menu(ufw)> ";
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 522)         cin >> status;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 523) 
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 524)         ostringstream os;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 525) 
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 526)         switch (status[0]) {
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 527)             case '?': 
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 528)                 cout << "Enter \'y\' to enable, " << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 529)                 cout << "enter \'n\' to disable, " << endl;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 530)                 cout << "enter \'r\' to reset all rules," << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 531)                 cout << "enter \'l\' to list rules, " << endl;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 532)                 cout << "enter \'a\' to add rules, " << endl;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 533)                 cout << "enter \'d\' to delete rules, " << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 534)                 cout << "enter \'c\' to continue." << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 535)                 break;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 536)             case 'y':
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 537)                 system("ufw enable");
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 538)                 break;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 539)             case 'n':
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 540)                 system("ufw disable");
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 541)                 break;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 542)             case 'r': 
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 543)                 system("ufw reset");
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 544)                 cout << "ufw disabled" << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 545)                 break;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 546)             case 'l': 
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 547)                 cout << "Current list of Firewall Rules (empty of no rules): " << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 548)                 system("ufw status numbered");
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 549)                 break;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 550)             case 'a': {
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 551)                 string command;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 552)                 string filter = "allow";
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 553)                 string trafDir = "in";
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 554)                 string source = "any";
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 555)                 string dest = "any";
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 556)                 int port = 22;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 557)                 string proto = "tcp";
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 558)                 bool back = false;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 559) 
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 560)                 os.str("");
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 561)                 os.clear();
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 562)                 
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 563)                 cout << "Add rules mode:" << endl << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 564)                 cout << "To return back to menu enter \'b\'." << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 565)                 cout << "Enter ? for help" << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 566)                 cout << "Enter \'reset\' for any time to reset rules to default." << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 567) 
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 568)                 while (!back) {
+9a406970 (Jason Dong 2025-10-12 16:18:30 -0400 569)                     cout << "AddRuleMode(ufw)> ";
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 570)                     cin >> input;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 571)                     switch (input[0]) {
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 572)                         case '?': 
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 573)                             ufwHelpPrint();
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 574)                             break;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 575)                         case 'l': 
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 576)                             system("ufw status numbered");
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 577)                             cout << "Current list of Firewall Rules (empty of no rules): " << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 578)                             break;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 579)                         case 'b': 
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 580)                             cout << "Going back to ufw Main Menu" << endl << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 581)                             back = true;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 582)                             break;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 583)                         case 'r':
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 584)                             cout << "Template Reset" << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 585)                             filter = "";
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 586)                             trafDir = "";
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 587)                             source = "any";
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 588)                             dest = "any";
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 589)                             port = -1;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 590)                             proto = "tcp";
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 591)                             break;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 592)                         case 'p':
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 593)                             cout << endl << "Filter: " << filter << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 594)                             cout << "Traffic Direction: " << trafDir << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 595)                             cout << "Source IP: " << source << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 596)                             cout << "Destination IP: " << dest << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 597)                             cout << "Destination port: " << port << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 598)                             cout << "Protocol: " << proto << endl << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 599)                             break;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 600)                         case 'w': 
+1b1b91fb (Jason Dong 2025-10-12 16:06:31 -0400 601)                             ufwWriteTemplMode(filter, trafDir, source, dest, port, proto);
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 602)                             break;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 603)                         case 'a': 
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 604)                             cout << "Adding Rule..." << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 605)                             os << "ufw " << filter << " " << trafDir << " from " << source << " to " << dest << " port "
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 606)                             << port << " proto " << proto;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 607)                             command = os.str();
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 608) 
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 609)                             system(command.c_str());
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 610)                             break;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 611)                         default: 
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 612)                             cout << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 613)                             cout << "Invalid Input:" << endl
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 614)                             << "? - help" << endl
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 615)                             << "l - list current rules" << endl
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 616)                             << "b - back to menu" << endl
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 617)                             << "r - reset template to default" << endl
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 618)                             << "p - print template" << endl
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 619)                             << "w - enter template write mode" << endl
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 620)                             << "a - adding rule to ufw" << endl << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 621)                             break;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 622)                     }
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 623)                 }
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 624)                 break;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 625)             }
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 626)             case 'd': {
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 627)                 int num;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 628)                 bool backd = false;          // back to menu
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 629)                 
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 630)                 while (!backd) {
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 631)                     cout << "Current list of Firewall Rules (empty of no rules): " << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 632)                     system("ufw status numbered");
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 633)                     cout << "To return back to menu, enter \'0\'." << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 634)                     cout << "Delete rule with the associated number: ";
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 635)                     cin >> num;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 636)                     cout << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 637) 
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 638)                     // error checking for ints
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 639)                     if (cin.fail()) {
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 640)                         cout << "Not an Integer." << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 641)                         cin.clear();
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 642)                         cin.ignore(numeric_limits<streamsize>::max(), '\n');
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 643)                     }
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 644)                     else {
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 645)                         // user enter 0 return back to menu
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 646)                         if (num == 0) {
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 647)                             backd = true;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 648)                             continue;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 649)                         }
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 650)                         // delete the associated num firewall
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 651)                         string command;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 652)                         os.str("");
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 653)                         os.clear();
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 654)                         os << "ufw delete " << num;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 655)                         command = os.str();
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 656) 
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 657)                         system(command.c_str());
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 658)                         cout << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 659)                     }
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 660)                 }
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 661)                 break;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 662)             }
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 663)             case 'c': 
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 664)                 continueSig = true;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 665)                 break;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 666)             default:
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 667)                 cout << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 668)                 cout << "Invalid Input: " << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 669)                 cout << "Enter \'y\' to enable, " << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 670)                 cout << "enter \'n\' to disable, " << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 671)                 cout << "enter \'r\' to reset," << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 672)                 cout << "enter \'l\' to list rules, " << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 673)                 cout << "enter \'a\' to add rule, " << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 674)                 cout << "enter \'d\' to delete rule, " << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 675)                 cout << "enter \'c\' to continue." << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 676)                 break;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 677)         }
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 678) 
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 679)     }
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 680) 
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 681)     cout << endl << endl;
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 682) 
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 683)     system("rm ufwtmpFile.txt");
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 684) }
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 685) 
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 686) bool isReverseShell(const string& psLine) {
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 687)     // Split the line into fields
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 688)     regex suspicious_patterns[] = {
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 689)         regex("nc.*-[lve].*"),              // netcat with flags
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 690)         regex("ncat.*-[lve].*"),            // nmap netcat
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 691)         regex(".*-e.*/bin/(bash|sh)"),      // execute shell
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 692)         regex("bash.*-i"),                  // interactive bash
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 693)         regex("python.*-c.*socket"),        // python reverse shell
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 694)         regex("perl.*-e.*socket"),          // perl reverse shell
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 695)     };
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 696) 
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 697)     int size = sizeof(suspicious_patterns) / sizeof(suspicious_patterns[0]);
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 698)     for (int i = 0; i < size; i++) {
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 699)         if (psLine.find("code") != string::npos) {
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 700)             return false;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 701)         }
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 702)         if (regex_search(psLine, suspicious_patterns[i])) {
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 703)             return true;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 704)         }
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 705)     }
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 706)     return false;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 707) }
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 708) 
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 709) void ncat_backdoor() {
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 710)     // first check for user permissions: require root permission
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 711)     if (geteuid() != 0) {
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 712)         cerr << "You need \"root\" permission to check /etc/apt/sources.list" << endl;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 713)         return;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 714)     }
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 715) 
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 716)     system("ps aux > ncattmpfile.txt");
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 717) 
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 718)     ifstream file("ncattmpfile.txt");
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 719)     if (file.fail()) {
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 720)         cerr << "File failed to open." << endl << endl;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 721)         file.close();
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 722)         return;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 723)     }
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 724) 
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 725)     string buffer;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 726)     vector<string> flag;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 727) 
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 728)     cout << "Scanning processes for reverse shell..." << endl;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 729)     
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 730)     while (getline(file, buffer)) {
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 731)         if (isReverseShell(buffer)) {
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 732)             flag.push_back(buffer);
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 733)         }
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 734)     }
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 735)     
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 736)     if (!flag.empty()) {
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 737)         cout << "These commands are flagged for being suspected reverse shell:" << endl;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 738)         for (size_t i = 0; i < flag.size(); i++) {
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 739)             cout << flag[i] << endl;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 740)         }
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 741)     }
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 742)     else {
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 743)         cout << "No suspicious reverse shell process found. < __ >" << endl;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 744)     }
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 745) 
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 746)     cout << endl;
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 747) 
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 748)     file.close();
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 749)     system("rm ncattmpfile.txt");
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 750) }
+
+jdong11.h
+
+2ad3bad6 (Jason Dong 2025-09-19 20:47:39 -0400  1) #ifndef JDONG11_H
+2ad3bad6 (Jason Dong 2025-09-19 20:47:39 -0400  2) #define JDONG11_H
+2ad3bad6 (Jason Dong 2025-09-19 20:47:39 -0400  3) 
+2ad3bad6 (Jason Dong 2025-09-19 20:47:39 -0400  4) using namespace std;
+2ad3bad6 (Jason Dong 2025-09-19 20:47:39 -0400  5) 
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400  6) // check if /etc/apt/sources.list URLs is valid
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400  7) void check_sources_list();
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400  8) // check all users in sudo group and print if out
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400  9) void check_sudo();
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 10) // check if system is up-to-date
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 11) void check_sys_updated();
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 12) // checking firewall of system
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 13) void check_ufw();
+d71ca831 (Jason Dong 2025-10-10 21:01:29 -0400 14) // setting up Network Intrusion Detection system
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 15) // void check_snort();
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 16) // checking for ncat backdoor both 'nc' and 'ncat'
+49f7cdd8 (Jason Dong 2025-10-18 19:33:58 -0400 17) void ncat_backdoor();
+2ad3bad6 (Jason Dong 2025-09-19 20:47:39 -0400 18) #endif
