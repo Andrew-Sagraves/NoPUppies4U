@@ -23,3 +23,6 @@
 I used Github Copilot to help provide small code snippets and suggestions. I used ChatGPT-5 and Claude Sonnet 4 on my Project.
 ## What you accomplished
 I was able to complete 3 functions that was able to check if /etc/apt/sources.list URLs is valid, check all users in sudo group and print it out, check if system is up-to-date. 
+
+## Retrospective
+I feel like I could make better use of the AI to do repetitive stuff on check_ufw() function because a lot of the code is just repeating stuff.
