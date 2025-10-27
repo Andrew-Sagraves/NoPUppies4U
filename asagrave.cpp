@@ -1,6 +1,5 @@
 #include "asagrave.h"
 #include <dirent.h>
-#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -11,7 +10,7 @@
 #include <unordered_map>
 #include <vector>
 #include <cstring>
-
+#include <array>
 using namespace std;
 
 extern bool VERBOSE;
@@ -389,4 +388,103 @@ bool suid_binary_audit(const std::string& logDir) {
     return found;
 }
 
+static std::string exec_cmd(const std::string &cmd) {
+    std::array<char, 256> buf{};
+    std::string out;
+    std::unique_ptr<FILE, decltype(&pclose)> p(popen(cmd.c_str(), "r"), pclose);
+    if (!p) return "";
+    while (fgets(buf.data(), buf.size(), p.get())) out += buf.data();
+    while (!out.empty() && (out.back() == '\n' || out.back() == '\r')) out.pop_back();
+    return out;
+}
+
+static bool stat_path(const std::string &p, uid_t &u, gid_t &g, mode_t &m) {
+    struct stat st; if (stat(p.c_str(), &st)) return false;
+    u = st.st_uid; g = st.st_gid; m = st.st_mode; return true;
+}
+
+static bool is_writable_by_nonroot(const std::string &p) {
+    uid_t u; gid_t g; mode_t m; if (!stat_path(p,u,g,m)) return false;
+    return ((m&S_IWUSR && u) || (m&S_IWGRP && g) || (m&S_IWOTH));
+}
+
+static std::string md5(const std::string &p) {
+    return exec_cmd("md5sum '" + p + "' 2>/dev/null | awk '{print $1}'");
+}
+
+static void log_line(const std::string &f, const std::string &l) {
+    std::ofstream o(f,std::ios::app); if(o) o<<l<<'\n';
+}
+
+/* -------- SUID / Package ownership audit -------- */
+bool suid_package_audit(const std::string &log) {
+    bool issues=false;
+    log_line(log,"=== SUID/SGID package audit ===");
+    std::istringstream s(exec_cmd("find / -xdev -type f \\( -perm -4000 -o -perm -2000 \\) -print 2>/dev/null"));
+    for(std::string f; std::getline(s,f);){
+        uid_t u; gid_t g; mode_t m;
+        if(!stat_path(f,u,g,m)) continue;
+        std::string pkg,sys=""; 
+        std::string d=exec_cmd("dpkg -S '"+f+"' 2>/dev/null|head -1");
+        if(d.find(':')!=std::string::npos){pkg=d.substr(0,d.find(':'));sys="dpkg";}
+        else {
+            std::string r=exec_cmd("rpm -qf '"+f+"' 2>/dev/null");
+            if(r.find("not owned")==std::string::npos){pkg=r;sys="rpm";}
+        }
+        std::ostringstream ev;
+        ev<<"File:"<<f<<" perms:"<<std::oct<<(m&07777)<<std::dec;
+        if(pkg.empty()){
+            log_line(log,ev.str()+" | pkg:(none) => suspicious"); issues=true; continue;
+        }
+        bool bad=false;
+        if(sys=="dpkg"){
+            std::string info="/var/lib/dpkg/info/"+pkg+".md5sums";
+            std::string ref=exec_cmd("grep -F ' "+f+"' '"+info+"' 2>/dev/null|awk '{print $1}'");
+            std::string local=md5(f);
+            if(!ref.empty()&&!local.empty()&&ref!=local) bad=true;
+        } else if(sys=="rpm"){
+            bad=!exec_cmd("rpm -Vf '"+f+"' 2>/dev/null").empty();
+        }
+        log_line(log,ev.str()+" pkg:"+pkg+(bad?" => modified":" => ok"));
+        if(bad) issues=true;
+    }
+    log_line(log,"=== End SUID/SGID audit ===");
+    return issues;
+}
+
+/* -------- systemd unit audit -------- */
+bool systemd_unit_audit(const std::string &log) {
+    bool issues=false;
+    log_line(log,"=== systemd unit audit ===");
+    std::vector<std::string> dirs={"/etc/systemd/system","/lib/systemd/system","/usr/lib/systemd/system","/run/systemd/system"};
+    std::vector<std::string> units;
+    for(auto &d:dirs){
+        std::istringstream s(exec_cmd("find '"+d+"' -type f \\( -name '*.service' -o -name '*.timer' \\) -print 2>/dev/null"));
+        for(std::string u;std::getline(s,u);) if(!u.empty()) units.push_back(u);
+    }
+    for(auto &u:units){
+        uid_t uid; gid_t gid; mode_t mode;
+        if(stat_path(u,uid,gid,mode)&&uid){
+            log_line(log,"non-root owned unit:"+u); issues=true;
+        }
+        auto pos=u.find_last_of('/'); std::string dir=u.substr(0,pos);
+        if(is_writable_by_nonroot(dir)){log_line(log,"unit dir writable:"+dir); issues=true;}
+        std::ifstream f(u); if(!f) continue;
+        std::string line;
+        while(std::getline(f,line)){
+            std::string t=line; t.erase(0,t.find_first_not_of(" \t"));
+            if(t.rfind("ExecStart",0)&&t.rfind("ExecStartPre",0)&&t.rfind("ExecStartPost",0)) continue;
+            auto eq=t.find('='); if(eq==std::string::npos) continue;
+            std::string cmd=t.substr(eq+1);
+            std::istringstream ss(cmd); std::string exe; ss>>exe;
+            if(exe.empty()||exe[0]!='/') continue;
+            std::string parent=exe.substr(0,exe.find_last_of('/'));
+            if(is_writable_by_nonroot(parent)||is_writable_by_nonroot(exe)||exe.find("/tmp/")==0){
+                log_line(log,"risk Exec:"+exe+" in "+u); issues=true;
+            }
+        }
+    }
+    log_line(log,"=== End systemd audit ===");
+    return issues;
+}
 
