@@ -17,6 +17,8 @@ using namespace std;
     Area of improvement: Allow user to add their own known list of URLs
 */
 
+extern bool VERBOSE;
+
 void check_sources_list() {
     // first check for user permissions: require root permission
     if (geteuid() != 0) {
@@ -196,7 +198,7 @@ void check_sys_updated() {
     // parse through each line of update.log
     while (getline(file, buffer)) {
         if (buffer.find("All packages are up to date.") != string::npos) {
-            cout << "!!! System is up to date ♡⸜(˶˃ ᵕ ˂˶)⸝♡" << endl << endl;
+            cout << "!!! System is up to date â¡â¸(Ë¶Ë áµ ËË¶)â¸â¡" << endl << endl;
             file.close();
             return;
         }
@@ -227,7 +229,7 @@ void check_sys_updated() {
                 system("apt list --upgradable");
                 break;
             default: 
-                cerr << "Invalid input. Please enter \'y\', \'n\', or \'l\'. (╯°□°）╯︵ ~┻━┻" << endl;
+                cerr << "Invalid input. Please enter \'y\', \'n\', or \'l\'. (â¯Â°â¡Â°ï¼â¯ï¸µ ~â»ââ»" << endl;
                 break;
         }
     }
@@ -250,7 +252,7 @@ void check_sys_updated() {
         errorFile.close();
     }
 
-    cout << "All logs are in /var/log/NoPUppies4U/ ദ്ദി(｡•̀ ,<)~✩‧₊" << endl << endl;
+    cout << "All logs are in /var/log/NoPUppies4U/ à´¦àµà´¦à´¿(ï½¡â¢Ì ,<)~â©â§â" << endl << endl;
 
     file.close();
 }
