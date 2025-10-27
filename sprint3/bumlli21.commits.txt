@@ -1,0 +1,254 @@
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400   5) #include <fstream>
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400   7) #include <sys/stat.h>
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400   8) #include <map>
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400   9) #include <sstream>
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  15) //Loads previous date modified time from a file into a map
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  16) map<string, time_t> load_previous_date_modified(const string& dateModifiedFile) {
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  17)     map<string, time_t> timestamps;
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  18)     ifstream recordFile(dateModifiedFile);
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  20)     if (!recordFile.is_open()) {
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  21)         cout << "date_modified.txt not found. Creating new file." << endl;
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  22)         return timestamps; //Return an empty map
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  23)     }
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  25)     string line;
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  26) 
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  27)     while (getline(recordFile, line)) {
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  28)         stringstream stringStream(line);
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  29)         string filePath;
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  30)         time_t dateModified;
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  31)         
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  32)         //Format = <filepath> - <datemodified>
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  33)         if (getline(stringStream, filePath, '-') && stringStream >> dateModified) {
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  34)             //Removes space at end of filePath if it exists
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  35)             if (!filePath.empty() && filePath.back() == ' ') {
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  36)                 filePath.pop_back();
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  37)             }
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  38) 
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  39)             timestamps[filePath] = dateModified;
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  40)         }
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  43)     recordFile.close();
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  44) 
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  45)     return timestamps;
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  49) //Creates a vector of all files in a directory and subdirectories
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400  50) vector<string> get_all_files_recursively(const string& directoryPath, bool ignoreHidden) {
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  51)     vector<string> filePath;
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  53)     if (!filesystem::is_directory(directoryPath)) {
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  54)         cerr << "Error: Not a valid directory - " << directoryPath << endl;
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  55)         return filePath; // Return empty list
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  58)     //Iterators to go through directory and subdirectories
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400  59)     filesystem::recursive_directory_iterator iterator(directoryPath, filesystem::directory_options::skip_permission_denied);
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  60)     filesystem::recursive_directory_iterator endingIterator;
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  62)     for (; iterator != endingIterator; ++iterator) {
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400  63)         try {
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400  64)             const auto& path = iterator->path();
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400  65)             string pathStr = path.string();
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400  66)             
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400  67)             // Skip hidden directories/files if ignoreHidden flag is set
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400  68)             if (ignoreHidden && (pathStr.find("/.")  != string::npos || pathStr.find("\\.") != string::npos)) {
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400  69)                 // If it's a directory, prevent recursion into it
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400  70)                 if (filesystem::is_directory(path)) {
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400  71)                     iterator.disable_recursion_pending();
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400  72)                 }
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400  73)                 continue;
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400  74)             }
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400  75) 
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400  76)             //Only adds files, not directories or other types like symlinks
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400  77)             if (filesystem::is_regular_file(path)) {
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400  78)                 filePath.push_back(pathStr);
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400  79)             }
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400  80)         } catch (const filesystem::filesystem_error& e) {
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400  81)             cerr << "Error accessing path: " << e.what() << endl;
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400  82)             continue;
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  83)         }
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  84)     }
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  85)     
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  86)     return filePath;
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  89) //This is an all in one function that does everything.
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  90) //Checks a directory for changed files, generates a report, and updates records.
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400  91) void check_directory_for_changes(const string& checkingDirectory, const DirectoryCheckFlags& flags) {
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400  92)     // If root check flag is set and directory isn't already root, start from root
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400  93)     string effectiveDirectory = checkingDirectory;
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400  94)     if (flags.rootCheck == true || checkingDirectory != "/") {
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400  95)         effectiveDirectory = "/";
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400  96)         cout << "Root check flag set. Checking entire system from root directory." << endl;
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400  97)     }
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400  98) 
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  99)     const string dateModifiedTxt = "date_modified.txt";
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 100)     const string newlyDateModifiedTxt = "new_date_modified.txt";
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 102)     //Load the old timestamps into our efficient map, unless writeNew flag is set
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 103)     map<string, time_t> oldDateModified;
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 104)     if (!flags.writeNew) {
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 105)         oldDateModified = load_previous_date_modified(dateModifiedTxt);
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 106)     } else {
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 107)         cout << "Write new flag set. Ignoring existing date_modified.txt file." << endl;
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 108)     }
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 110)     //Get a list of all files currently in the directory and subdirectories
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 111)     vector<string> currentFiles = get_all_files_recursively(effectiveDirectory, flags.ignoreHidden);
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 113)     if (currentFiles.empty()) {
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 114)         cout << "No files found in directory." << endl;
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 115)         return;
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 116)     }
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 117) 
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 118)     vector<string> newlyModifiedFiles;
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 119) 
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 120)     //New file to store updated timestamps
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 121)     ofstream newModifiedFile(dateModifiedTxt, ios::trunc);
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 123)     if (!newModifiedFile.is_open()) {
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 124)         cerr << "Error: Could not open record file - " << dateModifiedTxt << endl;
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 125)         return;
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 126)     }
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 128)     cout << "Scanning " << currentFiles.size() << " files..." << endl;
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 129) 
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 130)     //Loops through all current files to check for modifications
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 131)     for (size_t i = 0; i < currentFiles.size(); ++i) {
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 132)         const string& filePath = currentFiles[i];
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 133)         struct stat fileStat;
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 134) 
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 135)         //Gets the file's current modified time
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 136)         if (stat(filePath.c_str(), &fileStat) == 0) {
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 137)             time_t currentModifiedTime = fileStat.st_mtime;
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 138) 
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 139)             //Format: <filepath> - <datemodified>
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 140)             newModifiedFile << filePath << " - " << currentModifiedTime << "\n";
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 141) 
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 142)             //Checks if this file was modified
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 143)             if (oldDateModified.count(filePath)) {
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 144)                 //If the file is already there, compare its old and new timestamps.
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 145)                 if (currentModifiedTime > oldDateModified[filePath]) {
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 146)                     newlyModifiedFiles.push_back(filePath);
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 147)                 }
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 148)             } else {
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 149)                 //If the file is new, add it to the modified list
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 150)                 newlyModifiedFiles.push_back(filePath);
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 151)             }
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 152)         }
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 153)     }
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 154) 
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 155)     newModifiedFile.close();
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 156) 
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 157)     //If any files were modified, either print to console (VERBOSE) or create a report file
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 158)     if (!newlyModifiedFiles.empty()) {
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 159)         cout << newlyModifiedFiles.size() << " file(s) have been modified or added." << endl;
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 160) 
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 161)         if (flags.verbose) {
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 162)             cout << "VERBOSE mode: printing modified files to console instead of creating report file." << endl;
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 163)             for (const string& fpath : newlyModifiedFiles) {
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 164)                 cout << fpath << endl;
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 165)             }
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 166)         } else {
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 167)             cout << "Creating report file: " << newlyDateModifiedTxt << endl;
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 168) 
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 169)             ofstream reportDateModified(newlyDateModifiedTxt, ios::trunc);
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 170) 
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 171)             if (!reportDateModified.is_open()) {
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 172)                 cerr << "Error: Could not open report file - " << newlyDateModifiedTxt << endl;
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 173)             } else {
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 174)                 for (size_t i = 0; i < newlyModifiedFiles.size(); ++i) {
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 175)                     reportDateModified << newlyModifiedFiles[i] << "\n";
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 176)                 }
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 177)                 reportDateModified.close();
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 178)             }
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 179)         }
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 180)     } else {
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 181)         cout << "No files have been modified since the last check." << endl;
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 182)     }
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 184)     cout << "Check complete! Date modified times are now up to date." << endl;
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 185) }
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 186) 
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 187) //A helper function to parse a given log file for a list of keywords.
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 188) void parse_log_file(const string& logFilePath, const vector<string>& keywords, const string& reportFile) {
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 189)     ifstream logFile(logFilePath);
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 190) 
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 191)     //Check if the log file can be opened. Permissions might be an issue.
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 192)     if (!logFile.is_open()) {
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 193)         cerr << "Error: Could not open log file - " << logFilePath 
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 194)              << ". Try running with sudo permissions." << endl;
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 195)         return;
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 196)     }
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 197) 
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 198)     ofstream report(reportFile);
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 199)     if (!report.is_open()) {
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 200)         cerr << "Error: Could not create report file for writing - " << reportFile << endl;
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 201)         logFile.close();
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 202)         return;
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 203)     }
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 204) 
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 205)     cout << "Parsing " << logFilePath << " for keywords..." << endl;
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 206)     long matchCount = 0;
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 207)     string line;
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 208) 
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 209)     //Read the log file line by line
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 210)     while (getline(logFile, line)) {
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 211)         //Check if any of the keywords are present in the current line
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 212)         for (const string& keyword : keywords) {
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 213)             if (line.find(keyword) != string::npos) {
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 214)                 report << line << "\n";
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 215)                 matchCount++;
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 216)                 break; // Keyword found, no need to check for others on this line
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 217)             }
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 218)         }
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 219)     }
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 220) 
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 221)     logFile.close();
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 222)     report.close();
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 223) 
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 224)     cout << "Log parsing complete. Found " << matchCount << " matching lines." << endl;
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 225)     cout << "Report saved to " << reportFile << endl;
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 226) }
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 227) 
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 228) //Parses the main system log (/var/log/syslog) for keywords.
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 229) void parse_system_logs(const vector<string>& keywords, const string& reportFile) {
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 230)     parse_log_file("/var/log/syslog", keywords, reportFile);
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 231) }
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 232) 
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 233) //Parses the kernel log (/var/log/kern.log) for keywords.
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 234) void parse_kernel_logs(const vector<string>& keywords, const string& reportFile) {
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 235)     parse_log_file("/var/log/kern.log", keywords, reportFile);
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 237) 
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 238) //Parses the authentication log (/var/log/auth.log) for keywords.
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 239) void parse_authentication_logs(const vector<string>& keywords, const string& reportFile) {
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 240)     parse_log_file("/var/log/auth.log", keywords, reportFile);
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 241) }
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 242) 
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 243) //Parses the application log (/var/log/app.log) for keywords.
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 244) void parse_application_logs(const vector<string>& keywords, const string& reportFile) {
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 245)     parse_log_file("/var/log/app.log", keywords, reportFile);
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 246) }
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 247) 
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 248) //Parses all major logs for keywords and saves to respective reports.
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 249) void parse_all_logs(const vector<string>& keywords, const string& reportFile) {
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 250)     parse_system_logs(keywords, "system_" + reportFile);
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 251)     parse_kernel_logs(keywords, "kernel_" + reportFile);
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 252)     parse_authentication_logs(keywords, "auth_" + reportFile);
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 253)     parse_application_logs(keywords, "app_" + reportFile);
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 254) }
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  5) #include <vector>
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  6) #include <map>
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400  7) #include <ctime>
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 11) //Struct to hold flags for the directory check function
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 12) struct DirectoryCheckFlags {
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 13)     bool rootCheck = false;
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 14)     bool writeNew = false;
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 15)     bool ignoreHidden = false;
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 16)     bool verbose = false;
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 17) };
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 18) 
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 19) //Loads original date modified times from a file for comparison into a map
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 20) map<string, time_t> load_previous_date_modified(const string& dateModifiedFile);
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 21) //Recursively finds and stores all files in a directory and subdirectories in a vector
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 22) vector<string> get_all_files_recursively(const string& directoryPath, bool ignoreHidden = false);
+4d2003d3 (bmulli17      2025-09-29 16:50:55 -0400 23) //All in one function to create a date modified file and check against that file on subsequent runs
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 24) void check_directory_for_changes(const string& checkingDirectory, const DirectoryCheckFlags& flags = DirectoryCheckFlags());
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 25) 
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 26) //Parses a specified log file for keywords and saves matching lines to a report.
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 27) void parse_log_file(const string& logFilePath, const vector<string>& keywords, const string& reportFile);
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 28) //Parses /var/log/syslog for specific keywords.
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 29) void parse_system_logs(const vector<string>& keywords, const string& reportFile);
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 30) //Parses /var/log/kern.log for specific keywords.
+a22f5130 (bmulli17      2025-10-13 16:55:37 -0400 31) void parse_kernel_logs(const vector<string>& keywords, const string& reportFile);
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 32) //Parses /var/log/auth.log for specific keywords.
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 33) void parse_authentication_logs(const vector<string>& keywords, const string& reportFile);
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 34) //Parses /var/log/app.log for specific keywords.
+90d79cf6 (bmulli17      2025-10-27 18:02:24 -0400 35) void parse_application_logs(const vector<string>& keywords, const string& reportFile);
+c40d920d (bmulli17      2025-10-27 18:03:09 -0400 36) //Parses all major logs for keywords and saves to respective reports.
+c40d920d (bmulli17      2025-10-27 18:03:09 -0400 37) void parse_all_logs(const vector<string>& keywords, const string& reportFile);
