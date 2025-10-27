@@ -33,5 +33,7 @@ void parse_kernel_logs(const vector<string>& keywords, const string& reportFile)
 void parse_authentication_logs(const vector<string>& keywords, const string& reportFile);
 //Parses /var/log/app.log for specific keywords.
 void parse_application_logs(const vector<string>& keywords, const string& reportFile);
+//Parses all major logs for keywords and saves to respective reports.
+void parse_all_logs(const vector<string>& keywords, const string& reportFile);
 
 #endif
