@@ -12,6 +12,9 @@
 #include "hclark37.h"
 #include <vector>
 #include <iomanip>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <errno.h>
 
 using namespace std;
 
@@ -33,9 +36,9 @@ int main(int argc, char* argv[]) {
 		{"help",          no_argument,       0, 'h'},
 		{"crontab",       no_argument,       0, 'c'},
 		{"path",          no_argument,       0, 'p'}, 
-		{"sudo",          no_argument,       0, 's'}, 
-		{"ssh-keys",      no_argument,       0, 'k'},
-		{"suid",          no_argument,       0, 'b'},  
+		{"sudo",          optional_argument,       0, 's'}, 
+		{"ssh-keys",      optional_argument,       0, 'k'},
+		{"suid",          optional_argument,       0, 'b'},  
 		{"all",           no_argument,       0, 'a'},  
 		{"directory",     required_argument, 0, 'd'},
 		{"root",          no_argument,       0, 'r'},
@@ -47,6 +50,8 @@ int main(int argc, char* argv[]) {
 		{"kernel-logs",  required_argument, 0, 'K'}, 
 		{"no-pass", no_argument, 0, 'E'},
 		{"sudoers", no_argument, 0, 'S'},
+		{"log-dir", required_argument, 0, 'o'},
+		{"verbose",  no_argument, 0, 'v'},
 		{0, 0, 0, 0}
 	};
 	
@@ -62,19 +67,22 @@ int main(int argc, char* argv[]) {
 	
 	string logDir = "./"; //may not be hardcoded later
 	
-	while ((opt = getopt_long(argc, argv, "hrwicpSEksbagUd:L:K:", long_options, &options_index)) != -1) { //hvscp lets short options work, like -s
-		//you have to make sure to add any additional options to that ""
+	bool verbose = false; 
+	
+	while ((opt = getopt_long(argc, argv, "hrwicpSEagUd:L:K:ovk::s::b::", long_options, &options_index)) != -1) {
+	//you have to make sure to add any additional options to that ""
 		
 		switch (opt) {
+			
 			case 'h':
 				cout << "Usage: nopuppies4u [options]" << endl;
 				cout << "Options:" << endl;
 				cout << "  " << left << setw(25) << "-h,   --help"           << "Show this help message" << endl;
 				cout << "  " << left << setw(25) << "-c,   --crontab"        << "Check crontab" << endl;
 				cout << "  " << left << setw(25) << "-p,   --path"           << "Check PATH for vulnerabilities" << endl;
-				cout << "  " << left << setw(25) << "-s,   --sudo"           << "Check for passwordless sudo access" << endl;
-				cout << "  " << left << setw(25) << "-k,   --ssh-keys"       << "Scan for world-writable SSH keys" << endl;
-				cout << "  " << left << setw(25) << "-b,   --suid"           << "Scan for SUID binaries" << endl;
+				cout << "  " << left << setw(25) << "-s,   --sudo [path]"           << "Check for passwordless sudo access" << endl;
+				cout << "  " << left << setw(25) << "-k,   --ssh-keys [path]"       << "Scan for world-writable SSH keys" << endl;
+				cout << "  " << left << setw(25) << "-b,   --suid [path]"           << "Scan for SUID binaries" << endl;
 				cout << "  " << left << setw(25) << "-a,   --all"		<< "Run all security audits" << endl;
 				cout << "  " << left << setw(25) << "-d,   --directory <path>" << "Check directory for changes" << endl;
 				cout << "  " << left << setw(25) << "-r,   --root"           << "Force scan starting at root" << endl;
@@ -86,10 +94,50 @@ int main(int argc, char* argv[]) {
 				cout << "  " << left << setw(25) << "-K, --kernel-logs <word1,word2>" << "Parse /var/log/kern.log for keywords" << endl;
 				cout << "  " << left << setw(25) << "-E,   --no-pass"  << "Find users with empty passwords" << endl;
 				cout << "  " << left << setw(25) << "-S,   --sudoers" << "Scan sudoers files for users with sudo access" << endl;
+				cout << "  " << left << setw(25) << "-o,   --log-dir <path>" << "Specify output directory for logs" << endl;
+				cout << "  " << left << setw(25) << "-v,   --verbose"        << "Enable verbose output (more detailed logs)" << endl;
 
 				return 0;
 				break;
-			//confusing about how this would work with all- because of how --all exists?
+			case 'v':
+				verbose = true;
+				cout << "Verbose mode enabled" << endl;
+				break;
+			case 'o': {
+				if (optarg == nullptr) {
+					cerr << "Error: --log-dir requires an argument" << endl;
+					return 1;
+				}
+				
+				logDir = optarg;
+				
+				if (!logDir.empty() && logDir[logDir.size() - 1] != '/') {
+					logDir += '/'; 
+				}
+				
+				struct stat st;
+				if (stat(logDir.c_str(), &st) != 0) {
+					cout << "Log directory does not exist. Creating: " << logDir << endl;
+
+					if (mkdir(logDir.c_str(), 0755) != 0) {
+						perror("Error creating directory");
+						return 1;
+					}
+				} else if (!S_ISDIR(st.st_mode)) {
+					cerr << "Error: Provided path exists but is not a directory: " << logDir << endl;
+					return 1;
+				}
+				
+				if (access(logDir.c_str(), W_OK) != 0) {
+					cerr << "Error: No write permission for directory: " << logDir << endl;
+					return 1;
+				}	
+				
+				cout << "Log directory set to: " << logDir << endl;
+				
+				break;
+			}
+
 			case 'r':
 				dirFlags.rootCheck = true;
 				break;
@@ -179,17 +227,46 @@ int main(int argc, char* argv[]) {
 				check_sources_list();
 				break;
 			
-			case 's':
-				passwordless_sudo_access(logDir);
+			case 'b': {
+				string filename;
+
+				if (optarg != nullptr) {
+					filename = optarg;
+				} else {
+					filename = "suid_default.log";
+				}
+
+				suid_binary_audit(logDir + filename);
 				break;
-			
-			case 'k':
-				world_writable_ssh_keys(logDir);
+			}
+
+
+			case 'k': {
+				string filename;
+
+				if (optarg != nullptr) {
+					filename = optarg;
+				} else {
+					filename = "ssh_keys.log";
+				}
+
+				world_writable_ssh_keys(logDir + filename);
 				break;
-			
-			case 'b':
-				suid_binary_audit(logDir);
+			}
+
+
+			case 's': {
+				string filename;
+
+				if (optarg != nullptr) {
+					filename = optarg;
+				} else {
+					filename = "sudo_audit.log";
+				}
+
+				passwordless_sudo_access(logDir + filename);
 				break;
+			}
 			
 			case 'd': {
 				if (optarg == nullptr) {
