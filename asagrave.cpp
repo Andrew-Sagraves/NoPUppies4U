@@ -12,6 +12,7 @@
 #include <vector>
 #include <cstring>
 
+extern bool VERBOSE;
 
 // Retrieve PATH entries as a vector of strings
 std::vector<std::string> get_paths() {
@@ -203,14 +204,19 @@ void list_files_recursive(const std::string& base, std::vector<std::string>& fil
 // 1. Passwordless sudo access check
 // --------------------------------------------------------------
 bool passwordless_sudo_access(const std::string& logDir) {
-    std::string logFile = logDir;
+
+    if (VERBOSE) {
+        cout << "[SUDO] Checking for passwordless sudo access..." << endl;
+    }
+
+    string logFile = logDir;
     write_log(logFile, "=== Checking for passwordless SUDO access ===");
 
     bool found = false;
     const char* username = getenv("USER");
     if (!username) username = "UNKNOWN";
 
-    std::vector<std::string> sudoFiles;
+    vector<string> sudoFiles;
     sudoFiles.push_back("/etc/sudoers");
 
     // Include any files under /etc/sudoers.d
@@ -219,28 +225,49 @@ bool passwordless_sudo_access(const std::string& logDir) {
         struct dirent* e;
         while ((e = readdir(d)) != NULL) {
             if (e->d_name[0] == '.') continue;
-            sudoFiles.push_back(std::string("/etc/sudoers.d/") + e->d_name);
+            sudoFiles.push_back(string("/etc/sudoers.d/") + e->d_name);
         }
         closedir(d);
     }
 
     for (size_t i = 0; i < sudoFiles.size(); ++i) {
-        std::ifstream in(sudoFiles[i].c_str());
-        if (!in.is_open()) continue;
 
-        std::string line;
-        while (std::getline(in, line)) {
-            if (line.find("NOPASSWD") != std::string::npos &&
-                (line.find(username) != std::string::npos || line.find("ALL") != std::string::npos)) {
+        if (VERBOSE) {
+            cout << "[SUDO] Scanning: " << sudoFiles[i] << endl;
+        }
+
+        ifstream in(sudoFiles[i].c_str());
+        if (!in.is_open()) {
+            if (VERBOSE) {
+                cout << "[SUDO] Could not open: " << sudoFiles[i] << endl;
+            }
+            continue;
+        }
+
+        string line;
+        while (getline(in, line)) {
+            if (line.find("NOPASSWD") != string::npos &&
+                (line.find(username) != string::npos || line.find("ALL") != string::npos)) {
+                
                 found = true;
+
+                if (VERBOSE) {
+                    cout << "[SUDO] Passwordless entry found: " << line << endl;
+                }
+
                 write_log(logFile, "Passwordless sudo entry found in: " + sudoFiles[i]);
                 write_log(logFile, "  -> " + line);
             }
         }
     }
 
-    if (!found)
+    if (!found) {
         write_log(logFile, "No passwordless sudo entries found.");
+    }
+
+    if (VERBOSE) {
+        cout << "[SUDO] Sudo audit complete." << endl;
+    }
 
     return found;
 }
@@ -249,6 +276,11 @@ bool passwordless_sudo_access(const std::string& logDir) {
 // 2. World-writable SSH keys
 // --------------------------------------------------------------
 bool world_writable_ssh_keys(const std::string& logDir) {
+
+    if (VERBOSE) {
+        cout << "[SSH] Checking SSH key permissions..." << endl;
+    }
+
     std::string logFile = logDir;
     write_log(logFile, "=== Checking for world-writable SSH keys ===");
 
@@ -262,6 +294,11 @@ bool world_writable_ssh_keys(const std::string& logDir) {
     sshDirs.push_back("/etc/ssh");
 
     for (size_t i = 0; i < sshDirs.size(); ++i) {
+
+        if (VERBOSE) {
+            cout << "[SSH] Scanning directory: " << sshDirs[i] << endl;
+        }
+
         std::vector<std::string> files;
         list_files_recursive(sshDirs[i], files);
         for (size_t j = 0; j < files.size(); ++j) {
@@ -269,22 +306,38 @@ bool world_writable_ssh_keys(const std::string& logDir) {
             if (stat(files[j].c_str(), &st) == 0) {
                 if (st.st_mode & S_IWOTH) {
                     found = true;
+
+                    if (VERBOSE) {
+                        cout << "[SSH] World-writable SSH file: " << files[j] << endl;
+                    }
+
                     write_log(logFile, "World-writable SSH file: " + files[j]);
                 }
             }
         }
     }
 
-    if (!found)
+    if (!found) {
         write_log(logFile, "No world-writable SSH keys found.");
+    }
+
+    if (VERBOSE) {
+        cout << "[SSH] SSH permissions audit complete." << endl;
+    }
 
     return found;
 }
+
 
 // --------------------------------------------------------------
 // 3. SUID binary audit
 // --------------------------------------------------------------
 bool suid_binary_audit(const std::string& logDir) {
+
+    if (VERBOSE) {
+        cout << "[SUID] Starting SUID scan..." << endl;
+    }
+
     std::string logFile = logDir;
     write_log(logFile, "=== Scanning for SUID binaries ===");
 
@@ -301,6 +354,11 @@ bool suid_binary_audit(const std::string& logDir) {
     dirs.push_back("/opt");
 
     for (size_t i = 0; i < dirs.size(); ++i) {
+
+        if (VERBOSE) {
+            cout << "[SUID] Scanning directory: " << dirs[i] << endl;
+        }
+
         std::vector<std::string> files;
         list_files_recursive(dirs[i], files);
         for (size_t j = 0; j < files.size(); ++j) {
@@ -309,6 +367,11 @@ bool suid_binary_audit(const std::string& logDir) {
                 if (st.st_mode & S_ISUID) {
                     found = true;
                     count++;
+
+                    if (VERBOSE) {
+                        cout << "[SUID] SUID binary found: " << files[j] << endl;
+                    }
+
                     write_log(logFile, "SUID binary: " + files[j]);
                 }
             }
@@ -316,6 +379,12 @@ bool suid_binary_audit(const std::string& logDir) {
     }
 
     write_log(logFile, "Total SUID binaries found: " + std::to_string(count));
+
+    if (VERBOSE) {
+        cout << "[SUID] Scan complete. Total found: " << count << endl;
+    }
+
     return found;
 }
+
 
