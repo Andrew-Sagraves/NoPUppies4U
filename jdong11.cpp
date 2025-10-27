@@ -7,6 +7,7 @@
 #include <sstream>
 #include <limits>
 #include <regex>
+#include <algorithm>
 
 using namespace std;
 
@@ -37,10 +38,53 @@ void check_sources_list() {
     // reading from file and checking if valid
     printf("Checking /etc/apt/sources.list...\n");
     
-    string line; 
     int numUnknownSources = 0;
     vector<string> sources;
+    vector<string> trustedSources = {
+        "http://archive.ubuntu.com/ubuntu/",
+        "http://security.ubuntu.com/ubuntu/",
+        "http://archive.canonical.com/ubuntu",
+        "http://help.ubuntu.com/community/UpgradeNotes",
+        "deb http://archive.ubuntu.com/ubuntu/",
+        "deb http://security.ubuntu.com/ubuntu/",
+        "deb-src http://archive.ubuntu.com/ubuntu/",
+        "deb-src http://security.ubuntu.com/ubuntu/",
+        "deb http://archive.canonical.com/ubuntu",
+        "deb-src http://archive.canonical.com/ubuntu"
+    };
     bool deb822Format = false;
+
+    // Adding in trusted sources from user
+    system("mkdir -p /var/log/NoPUppies4U/");
+    ifstream trustedFileI("/var/log/NoPUppies4U/trustedSources.list");
+
+    if (trustedFileI.fail()) {
+        // File doesn't exist, create it
+        cout << "Trusted sources file doesn't exist. Creating new file..." << endl;
+        
+        ofstream createFile("/var/log/NoPUppies4U/trustedSources.list");
+        if (createFile.is_open()) {
+            createFile << "# Custom trusted sources - add your additional trusted URLs here" << endl;
+            createFile << "# Example: http://ppa.launchpad.net/your-ppa/ubuntu/" << endl;
+            createFile << "" << endl;  // Empty line for user to add sources
+            createFile.close();
+            cout << "Created empty trusted sources file at /var/log/NoPUppies4U/trustedSources.list" << endl;
+        } else {
+            cout << "Error: Could not create trusted sources file!" << endl;
+            return;
+        }
+        
+        // Now try to open it again for reading (though it will be mostly empty)
+        trustedFileI.open("/var/log/NoPUppies4U/trustedSources.list");
+    }
+    string input;
+    string tmp;
+    string line;
+    while (getline(trustedFileI, line)) {
+        if (!line.empty() && line[0] != '#') {
+            trustedSources.push_back(line);
+        }
+    }
 
     // checking for urls in sources.list and push into vector
     while (getline(file, line)) {
@@ -51,6 +95,8 @@ void check_sources_list() {
             sources.push_back(line);
         }
     }
+
+    trustedFileI.close();
 
     // parse the /etc/apt/sources.list file again line by line for deb822 which means the actual sources are in a different path Ubuntu 22.04+
     file.clear();
@@ -87,36 +133,69 @@ void check_sources_list() {
     // Print out the unknown sources
     cout << sources.size() << " total sources found..." << endl;
     for (size_t i = 0; i < sources.size(); i++) {
-        if (!deb822Format) {
-            // Check if it's not one of the valid Ubuntu sources with sources.list format
-            if (
-                sources[i].find("deb http://archive.ubuntu.com/ubuntu/") == string::npos &&
-                sources[i].find("deb http://security.ubuntu.com/ubuntu/") == string::npos &&
-                sources[i].find("deb-src http://archive.ubuntu.com/ubuntu/") == string::npos && 
-                sources[i].find("deb-src http://security.ubuntu.com/ubuntu/") == string::npos &&
-                sources[i].find("deb http://archive.canonical.com/ubuntu") == string::npos &&
-                sources[i].find("deb-src http://archive.canonical.com/ubuntu") == string::npos
-                ) {
-                cout << "Unknown source found: " << sources[i] << endl;
-                numUnknownSources += 1;
+        bool trusted = false;
+
+        // check current source vector against all trustedSource vector
+        for (size_t j = 0; j < trustedSources.size(); j++) {
+            if (sources[i].find(trustedSources[j]) != string::npos) {
+                trusted = true;
+                break;
             }
         }
-        // Check if it's not one of the valid Ubuntu sources with deb822 format
-        else {
-            if (
-                sources[i].find("http://archive.ubuntu.com/ubuntu/") == string::npos &&
-                sources[i].find("http://security.ubuntu.com/ubuntu/") == string::npos &&
-                sources[i].find("http://archive.canonical.com/ubuntu") == string::npos &&
-                sources[i].find("http://help.ubuntu.com/community/UpgradeNotes") == string::npos
-                ) {
-                cout << "Unknown source found: " << sources[i] << endl;
-                numUnknownSources += 1;
-            }
+
+        // If URL is not trusted
+        if (!trusted) {
+            cout << "Unknown source found: " << sources[i] << endl;
+            numUnknownSources++;
         }
     }
 
-    file.close();
     cout << "!!! Num Unknown sources: " << numUnknownSources << " ^^^" << endl << endl;
+
+    // adding and deleting urls
+    ofstream trustedFile("/var/log/NoPUppies4U/trustedSources.list");
+    if (trustedFile.fail()) {
+        cout << "/var/log/NoPUppies4U/trustedSources.list output failed to open" << endl;
+        return;
+    }
+    while (true) {
+        cout << "Add or delete trusted sources or continue? (a/d/c) > ";
+        cin >> input;
+        cout << endl;
+        if (cin.fail()) {
+            cerr << "Invalid Input!" << endl;
+            cin.clear();
+            cin.ignore(numeric_limits<streamsize>::max(), '\n');
+            continue;
+        }
+        if (input[0] == 'a') {
+            cout << "Input URL > ";
+            cin >> input;
+            trustedSources.push_back(input);
+            cout << "URL added to trusted sources!!" << endl;
+        }
+        else if (input[0] == 'd') {
+            cout << "Delete URL > ";
+            cin >> input;
+            for (size_t i = 0; i < trustedSources.size(); i++) {
+                if (trustedSources[i].find(input) != string::npos) {
+                    trustedSources.erase(trustedSources.begin() + i);
+                    cout << "URL deleted" << endl;
+                    break;
+                }
+            }
+        }
+        else if (input[0] == 'c') {
+            for (size_t i = 10; i < trustedSources.size(); i++) {
+                trustedFile << trustedSources[i] << endl;
+            }
+            cout << "Continuing.." << endl;
+            break;
+        }
+    }
+
+    trustedFile.close();
+    file.close();
 }
 
 // checks /etc/group for users in sudo group
@@ -198,7 +277,7 @@ void check_sys_updated() {
     // parse through each line of update.log
     while (getline(file, buffer)) {
         if (buffer.find("All packages are up to date.") != string::npos) {
-            cout << "!!! System is up to date â¡â¸(Ë¶Ë áµ ËË¶)â¸â¡" << endl << endl;
+            cout << "!!! System is up to date !!!" << endl << endl;
             file.close();
             return;
         }
@@ -229,7 +308,7 @@ void check_sys_updated() {
                 system("apt list --upgradable");
                 break;
             default: 
-                cerr << "Invalid input. Please enter \'y\', \'n\', or \'l\'. (â¯Â°â¡Â°ï¼â¯ï¸µ ~â»ââ»" << endl;
+                cerr << "Invalid input. Please enter \'y\', \'n\', or \'l\'." << endl;
                 break;
         }
     }
@@ -252,7 +331,7 @@ void check_sys_updated() {
         errorFile.close();
     }
 
-    cout << "All logs are in /var/log/NoPUppies4U/ à´¦àµà´¦à´¿(ï½¡â¢Ì ,<)~â©â§â" << endl << endl;
+    cout << "All logs are in /var/log/NoPUppies4U/" << endl << endl;
 
     file.close();
 }
