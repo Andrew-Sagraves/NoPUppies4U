@@ -47,7 +47,7 @@ map<string, time_t> load_previous_date_modified(const string& dateModifiedFile) 
 
 
 //Creates a vector of all files in a directory and subdirectories
-vector<string> get_all_files_recursively(const string& directoryPath) {
+vector<string> get_all_files_recursively(const string& directoryPath, bool ignoreHidden) {
     vector<string> filePath;
 
     if (!filesystem::is_directory(directoryPath)) {
@@ -65,8 +65,11 @@ vector<string> get_all_files_recursively(const string& directoryPath) {
             string pathStr = path.string();
             
             // Skip hidden directories/files if ignoreHidden flag is set
-            if (pathStr.find("/.")  != string::npos || pathStr.find("\\.") != string::npos) {
-                iterator.disable_recursion_pending();
+            if (ignoreHidden && (pathStr.find("/.")  != string::npos || pathStr.find("\\.") != string::npos)) {
+                // If it's a directory, prevent recursion into it
+                if (filesystem::is_directory(path)) {
+                    iterator.disable_recursion_pending();
+                }
                 continue;
             }
 
@@ -81,8 +84,6 @@ vector<string> get_all_files_recursively(const string& directoryPath) {
     }
     
     return filePath;
-    
-    return filePath;
 }
 
 //This is an all in one function that does everything.
@@ -90,7 +91,7 @@ vector<string> get_all_files_recursively(const string& directoryPath) {
 void check_directory_for_changes(const string& checkingDirectory, const DirectoryCheckFlags& flags) {
     // If root check flag is set and directory isn't already root, start from root
     string effectiveDirectory = checkingDirectory;
-    if (flags.rootCheck && checkingDirectory != "/") {
+    if (flags.rootCheck == true || checkingDirectory != "/") {
         effectiveDirectory = "/";
         cout << "Root check flag set. Checking entire system from root directory." << endl;
     }
@@ -107,7 +108,7 @@ void check_directory_for_changes(const string& checkingDirectory, const Director
     }
 
     //Get a list of all files currently in the directory and subdirectories
-    vector<string> currentFiles = get_all_files_recursively(effectiveDirectory);
+    vector<string> currentFiles = get_all_files_recursively(effectiveDirectory, flags.ignoreHidden);
 
     if (currentFiles.empty()) {
         cout << "No files found in directory." << endl;
@@ -153,20 +154,28 @@ void check_directory_for_changes(const string& checkingDirectory, const Director
 
     newModifiedFile.close();
 
-    //If any files were modified, create a report file
+    //If any files were modified, either print to console (VERBOSE) or create a report file
     if (!newlyModifiedFiles.empty()) {
         cout << newlyModifiedFiles.size() << " file(s) have been modified or added." << endl;
-        cout << "Creating report file: " << newlyDateModifiedTxt << endl;
 
-        ofstream reportDateModified(newlyDateModifiedTxt, ios::trunc);
-
-        if (!reportDateModified.is_open()) {
-            cerr << "Error: Could not open report file - " << newlyDateModifiedTxt << endl;
-        } else {
-            for (size_t i = 0; i < newlyModifiedFiles.size(); ++i) {
-                reportDateModified << newlyModifiedFiles[i] << "\n";
+        if (flags.verbose) {
+            cout << "VERBOSE mode: printing modified files to console instead of creating report file." << endl;
+            for (const string& fpath : newlyModifiedFiles) {
+                cout << fpath << endl;
             }
-            reportDateModified.close();
+        } else {
+            cout << "Creating report file: " << newlyDateModifiedTxt << endl;
+
+            ofstream reportDateModified(newlyDateModifiedTxt, ios::trunc);
+
+            if (!reportDateModified.is_open()) {
+                cerr << "Error: Could not open report file - " << newlyDateModifiedTxt << endl;
+            } else {
+                for (size_t i = 0; i < newlyModifiedFiles.size(); ++i) {
+                    reportDateModified << newlyModifiedFiles[i] << "\n";
+                }
+                reportDateModified.close();
+            }
         }
     } else {
         cout << "No files have been modified since the last check." << endl;
@@ -224,4 +233,22 @@ void parse_system_logs(const vector<string>& keywords, const string& reportFile)
 //Parses the kernel log (/var/log/kern.log) for keywords.
 void parse_kernel_logs(const vector<string>& keywords, const string& reportFile) {
     parse_log_file("/var/log/kern.log", keywords, reportFile);
+}
+
+//Parses the authentication log (/var/log/auth.log) for keywords.
+void parse_authentication_logs(const vector<string>& keywords, const string& reportFile) {
+    parse_log_file("/var/log/auth.log", keywords, reportFile);
+}
+
+//Parses the application log (/var/log/app.log) for keywords.
+void parse_application_logs(const vector<string>& keywords, const string& reportFile) {
+    parse_log_file("/var/log/app.log", keywords, reportFile);
+}
+
+//Parses all major logs for keywords and saves to respective reports.
+void parse_all_logs(const vector<string>& keywords, const string& reportFile) {
+    parse_system_logs(keywords, "system_" + reportFile);
+    parse_kernel_logs(keywords, "kernel_" + reportFile);
+    parse_authentication_logs(keywords, "auth_" + reportFile);
+    parse_application_logs(keywords, "app_" + reportFile);
 }
