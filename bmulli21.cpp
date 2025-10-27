@@ -10,6 +10,8 @@
 
 using namespace std;
 
+extern bool VERBOSE;
+
 //Loads previous date modified time from a file into a map
 map<string, time_t> load_previous_date_modified(const string& dateModifiedFile) {
     map<string, time_t> timestamps;
