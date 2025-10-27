@@ -149,7 +149,7 @@ vector<string> extract_paths(const string &cmd) {
 
 // Look line by line through a file and get commands/paths, currently prints
 // files to the console with their writability status
-void process_file(const filesystem::path &p, set<string> &checked_files, bool called_from_cron, std::vector<std::string> *all_checked_paths, std::vector<std::string> *writable_paths) {
+void process_file(const filesystem::path &p, set<string> &checked_files, bool called_from_cron, std::vector<std::string> *all_checked_paths, std::vector<std::string> *writable_paths, bool force_verbose) {
     if (!filesystem::is_regular_file(p)) {
         return;
     }
@@ -211,10 +211,9 @@ void process_file(const filesystem::path &p, set<string> &checked_files, bool ca
                 all_checked_paths->push_back(candidate);
             }
 
-            // When called from cron, avoid noisy per-line printing; instead
-            // collect paths in the provided vectors and let the caller decide
-            // what to print. For non-cron callers, keep original behavior.
-            if (!called_from_cron) {
+            // Print per-line output when not called from cron, or when forced
+            // verbose mode is requested.
+            if (!called_from_cron || force_verbose) {
                 cout << p << ":" << linenumber << " -> referencing: " << candidate;
                 if (filesystem::exists(candidate)) {
                     cout << " (exists) ";
@@ -224,19 +223,23 @@ void process_file(const filesystem::path &p, set<string> &checked_files, bool ca
                     if (stat(candidate.c_str(), &st) == 0) {
                         world_writable = (st.st_mode & S_IWOTH) != 0;
                     }
-                    // Only report writable when called from cron and file is world-writable.
-                    if (called_from_cron && world_writable) {
+                    // Report writable if the file is world-writable.
+                    if (world_writable) {
                         cout << "[WRITABLE]";
-                        if (writable_paths) writable_paths->push_back(candidate);
                     } else {
                         cout << "[not writable]";
+                    }
+                    // Only add to writable_paths when this was a cron scan
+                    // and the file is world-writable (preserve previous behavior).
+                    if (called_from_cron && world_writable) {
+                        if (writable_paths) writable_paths->push_back(candidate);
                     }
                     cout << endl;
                 } else {
                     cout << " (missing)" << endl;
                 }
             } else {
-                // Cron caller: collect writable paths if world-writable
+                // Cron caller (non-verbose): collect writable paths if world-writable
                 if (filesystem::exists(candidate)) {
                     struct stat st;
                     if (stat(candidate.c_str(), &st) == 0) {
@@ -247,6 +250,62 @@ void process_file(const filesystem::path &p, set<string> &checked_files, bool ca
                 }
             }
         }
+    }
+}
+
+// Verbose-aware wrapper for check_cron_jobs. If VERBOSE is false this simply
+// calls the normal check_cron_jobs(). If VERBOSE is true it performs the same
+// scan but forces per-line output and still collects writable paths.
+void check_cron_jobs_verbose() {
+    if (!VERBOSE) {
+        check_cron_jobs();
+        return;
+    }
+
+    // essentially same as check_cron_jobs but force per-line printing
+    if (geteuid() != 0) {
+        cerr << "You need \"root\" permission to check cron jobs. (Run program as sudo)" << endl;
+        return;
+    }
+
+    vector<string> cron_dirs = {
+        "/etc/cron.d",
+        "/etc/cron.daily",
+        "/etc/cron.hourly",
+        "/etc/cron.monthly",
+        "/etc/cron.weekly",
+        "/var/spool/cron",
+        "/var/spool/cron/crontabs"
+    };
+
+    set<string> checked_files;
+    vector<string> all_checked_paths;
+    vector<string> writable_paths;
+
+    filesystem::path etccrontab = "/etc/crontab";
+    if (filesystem::exists(etccrontab)) {
+        process_file(etccrontab, checked_files, true, &all_checked_paths, &writable_paths, true);
+    }
+
+    for (size_t di = 0; di < cron_dirs.size(); ++di) {
+        const string &dir = cron_dirs[di];
+        try {
+            if (!filesystem::exists(dir)) {
+                continue;
+            }
+            for (auto it = filesystem::directory_iterator(dir); it != filesystem::directory_iterator(); ++it) {
+                const filesystem::directory_entry &entry = *it;
+                process_file(entry.path(), checked_files, true, &all_checked_paths, &writable_paths, true);
+            }
+        } catch (const filesystem::filesystem_error &e) {
+            cerr << "Error reading " << dir << ": " << e.what() << endl;
+        }
+    }
+
+    cout << "Cron job (verbose) scan complete. Checked " << checked_files.size() << " distinct path(s)." << endl;
+    cout << "Writable paths referenced by cron jobs (world-writable):\n";
+    for (size_t i = 0; i < writable_paths.size(); ++i) {
+        cout << "  " << writable_paths[i] << '\n';
     }
 }
 
@@ -400,5 +459,103 @@ void check_sudoers() {
     cout << "Sudoers scan complete. Found " << users.size() << " unique user(s) in sudoers files." << endl;
     for (auto uit = users.begin(); uit != users.end(); ++uit){
         cout << "  " << *uit << endl;
+    }
+}
+
+
+void check_sudoers_permissions() {
+    // Must be root to inspect sudoers safely
+    if (geteuid() != 0) {
+        cerr << "You need \"root\" permission to check sudoers permissions. (Run program as sudo)" << endl;
+        return;
+    }
+
+    vector<filesystem::path> sudoers_files = {
+        "/etc/sudoers"
+    };
+    filesystem::path sudoers_d = "/etc/sudoers.d";
+    if (filesystem::exists(sudoers_d) && filesystem::is_directory(sudoers_d)) {
+        for (auto it = filesystem::directory_iterator(sudoers_d); it != filesystem::directory_iterator(); ++it) {
+            const filesystem::directory_entry &entry = *it;
+            if (entry.is_regular_file() || entry.is_symlink()) {
+                sudoers_files.push_back(entry.path());
+            }
+        }
+    }
+
+    bool any_problem = false;
+    cout << "Checking sudoers permissions..." << endl;
+    for (size_t i = 0; i < sudoers_files.size(); ++i) {
+        const filesystem::path &p = sudoers_files[i];
+        try {
+            if (!filesystem::exists(p)) {
+                cout << p << " : MISSING" << endl;
+                any_problem = true;
+                continue;
+            }
+
+            // Check if it's a regular file (or a symlink -> treat symlink as suspicious)
+            if (!filesystem::is_regular_file(p)) {
+                cout << p << " : not a regular file (type=";
+                if (filesystem::is_symlink(p)) {
+                    cout << "symlink";
+                } else if (filesystem::is_directory(p)) {
+                    cout << "directory";
+                } else {
+                    cout << "other";
+                }
+                cout << ")" << endl;
+                any_problem = true;
+                // continue checking permissions anyway
+            }
+
+            struct stat st;
+            if (stat(p.c_str(), &st) != 0) {
+                cout << p << " : stat() failed" << endl;
+                any_problem = true;
+                continue;
+            }
+
+            // Check owner and group (traditional: root:root)
+            bool owner_ok = (st.st_uid == 0);
+            bool group_ok = (st.st_gid == 0);
+
+            // Check mode bits (traditional: 0440)
+            mode_t mode = st.st_mode & 0777;
+            const mode_t expected = 0440;
+            bool mode_ok = (mode == expected);
+
+            if (!owner_ok || !group_ok || !mode_ok) {
+                any_problem = true;
+                cout << p << " : NON-TRADITIONAL permissions/ownership" << endl;
+
+                // owner and group as numeric IDs (no name lookup to avoid pwd/grp)
+                string owner = to_string(static_cast<unsigned long>(st.st_uid));
+                string group = to_string(static_cast<unsigned long>(st.st_gid));
+
+                // print current owner:group and mode
+                // print mode as 3-digit octal
+                char modebuf[16];
+                snprintf(modebuf, sizeof(modebuf), "%03o", mode);
+
+                cout << "    owner:group = " << owner << ":" << group << " (uid=" << st.st_uid << ", gid=" << st.st_gid << ")" << endl;
+                cout << "    mode = 0" << modebuf << " (expected 0440)" << endl;
+
+                // Extra checks: warn if world-writable or group-writable when not expected
+                if (mode & S_IWOTH) {
+                    cout << "    WARNING: file is world-writable" << endl;
+                }
+                if (mode & S_IXUSR || mode & S_IXGRP || mode & S_IXOTH) {
+                    cout << "    WARNING: execute bit(s) set (unexpected)" << endl;
+                }
+            }
+        } catch (const filesystem::filesystem_error &e) {
+            cerr << "Error inspecting " << p << ": " << e.what() << endl;
+            any_problem = true;
+        }
+    }
+
+    if (!any_problem) {
+        cout << "All sudoers files appear to have traditional ownership and permissions (root:root, 0440)." << endl;
     }
 }

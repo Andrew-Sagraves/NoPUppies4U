@@ -160,7 +160,7 @@ int main(int argc, char* argv[]) {
 				int problems = get_path_vulnerabilities(paths);
 				cout << "PATH scan complete. " << problems << " potential issue(s) found. Issues outputted to PATH.txt\n";
 			
-				check_cron_jobs();
+				check_cron_jobs_verbose();
 				
 				//i'm choosing to not include directory case in this because it would require the --all flag to take an argument, which wouldn't really work if another one required an argument as well
 				
@@ -265,7 +265,7 @@ int main(int argc, char* argv[]) {
 				break;
 			}
 			case 'c':
-				check_cron_jobs();
+				check_cron_jobs_verbose();
 				break;
 			case 'p': {
 				vector<string> paths = get_paths();
