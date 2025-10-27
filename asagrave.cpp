@@ -12,6 +12,8 @@
 #include <vector>
 #include <cstring>
 
+using namespace std;
+
 extern bool VERBOSE;
 
 // Retrieve PATH entries as a vector of strings
