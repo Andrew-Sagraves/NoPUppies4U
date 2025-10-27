@@ -9,7 +9,6 @@
 #include "bmulli21.h"
 #include "jdong11.h"
 #include "kbissonn.h"
-#include "hclark37.h"
 #include <vector>
 #include <iomanip>
 #include <sys/stat.h>
@@ -17,6 +16,8 @@
 #include <errno.h>
 
 using namespace std;
+
+bool VERBOSE = false;
 
 int main(int argc, char* argv[]) {
 	
@@ -48,7 +49,6 @@ int main(int argc, char* argv[]) {
 		{"system-update",  no_argument, 0, 'U'},
 		{"system-logs",  required_argument, 0, 'L'}, 
 		{"kernel-logs",  required_argument, 0, 'K'}, 
-		{"no-pass", no_argument, 0, 'E'},
 		{"sudoers", no_argument, 0, 'S'},
 		{"log-dir", required_argument, 0, 'o'},
 		{"verbose",  no_argument, 0, 'v'},
@@ -67,9 +67,7 @@ int main(int argc, char* argv[]) {
 	
 	string logDir = "./"; //may not be hardcoded later
 	
-	bool verbose = false; 
-	
-	while ((opt = getopt_long(argc, argv, "hrwicpSEagUd:L:K:ovk::s::b::", long_options, &options_index)) != -1) {
+	while ((opt = getopt_long(argc, argv, "hrwicpSagUd:L:K:ovk::s::b::", long_options, &options_index)) != -1) {
 	//you have to make sure to add any additional options to that ""
 		
 		switch (opt) {
@@ -92,7 +90,6 @@ int main(int argc, char* argv[]) {
 				cout << "  " << left << setw(25) << "-U,   --system-update"  << "Check if system is up to date" << endl;
 				cout << "  " << left << setw(25) << "-L, --system-logs <word1,word2>" << "Parse /var/log/syslog for keywords" << endl;
 				cout << "  " << left << setw(25) << "-K, --kernel-logs <word1,word2>" << "Parse /var/log/kern.log for keywords" << endl;
-				cout << "  " << left << setw(25) << "-E,   --no-pass"  << "Find users with empty passwords" << endl;
 				cout << "  " << left << setw(25) << "-S,   --sudoers" << "Scan sudoers files for users with sudo access" << endl;
 				cout << "  " << left << setw(25) << "-o,   --log-dir <path>" << "Specify output directory for logs" << endl;
 				cout << "  " << left << setw(25) << "-v,   --verbose"        << "Enable verbose output (more detailed logs)" << endl;
@@ -100,9 +97,10 @@ int main(int argc, char* argv[]) {
 				return 0;
 				break;
 			case 'v':
-				verbose = true;
+				VERBOSE = true;
 				cout << "Verbose mode enabled" << endl;
 				break;
+			
 			case 'o': {
 				if (optarg == nullptr) {
 					cerr << "Error: --log-dir requires an argument" << endl;
@@ -166,7 +164,6 @@ int main(int argc, char* argv[]) {
 				
 				//i'm choosing to not include directory case in this because it would require the --all flag to take an argument, which wouldn't really work if another one required an argument as well
 				
-				check_empty_passwords();
 				
 				check_ufw();
 				
@@ -175,11 +172,6 @@ int main(int argc, char* argv[]) {
 				return 0;
 				break;
 			}
-			
-			case 'E':
-				cout << "Checking for users with empty passwords..." << endl;
-				check_empty_passwords();
-				break;
 			
 			case 'L': { 
 				string argument = optarg; 
@@ -218,11 +210,6 @@ int main(int argc, char* argv[]) {
 				check_sys_updated();
 				break;
 
-			case 'u': {
-				check_empty_passwords();
-				break;
-			}
-			
 			case 'x':
 				check_sources_list();
 				break;
