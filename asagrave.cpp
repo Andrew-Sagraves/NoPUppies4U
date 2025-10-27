@@ -160,7 +160,7 @@ int get_path_vulnerabilities(const std::vector<std::string> &paths) {
 // Utility functions
 // --------------------------------------------------------------
 
-// Create a directory if it doesnât exist
+// Create a directory if it doesnÃ¢ÂÂt exist
 void ensure_dir(const std::string& path) {
     struct stat st;
     if (stat(path.c_str(), &st) != 0) {
@@ -203,7 +203,7 @@ void list_files_recursive(const std::string& base, std::vector<std::string>& fil
 // 1. Passwordless sudo access check
 // --------------------------------------------------------------
 bool passwordless_sudo_access(const std::string& logDir) {
-    std::string logFile = logDir + "/sudo_audit.log";
+    std::string logFile = logDir;
     write_log(logFile, "=== Checking for passwordless SUDO access ===");
 
     bool found = false;
@@ -249,7 +249,7 @@ bool passwordless_sudo_access(const std::string& logDir) {
 // 2. World-writable SSH keys
 // --------------------------------------------------------------
 bool world_writable_ssh_keys(const std::string& logDir) {
-    std::string logFile = logDir + "/ssh_key_audit.log";
+    std::string logFile = logDir;
     write_log(logFile, "=== Checking for world-writable SSH keys ===");
 
     bool found = false;
@@ -285,7 +285,7 @@ bool world_writable_ssh_keys(const std::string& logDir) {
 // 3. SUID binary audit
 // --------------------------------------------------------------
 bool suid_binary_audit(const std::string& logDir) {
-    std::string logFile = logDir + "/suid_audit.log";
+    std::string logFile = logDir;
     write_log(logFile, "=== Scanning for SUID binaries ===");
 
     bool found = false;
