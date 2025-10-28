@@ -48,7 +48,6 @@ int main(int argc, char* argv[]) {
 		{"sudo-group",     no_argument, 0, 'g'}, 
 		{"system-update",  no_argument, 0, 'U'},
 		{"system-logs",  required_argument, 0, 'L'}, 
-		{"kernel-logs",  required_argument, 0, 'K'}, 
 		{"sudoers", no_argument, 0, 'S'},
 		{"log-dir", required_argument, 0, 'o'},
 		{"verbose",  no_argument, 0, 'v'},
@@ -67,7 +66,7 @@ int main(int argc, char* argv[]) {
 	
 	string logDir = "./"; //may not be hardcoded later
 	
-	while ((opt = getopt_long(argc, argv, "hrwicpSagUd:L:K:ovk::s::b::", long_options, &options_index)) != -1) {
+	while ((opt = getopt_long(argc, argv, "hrwicpSagUd:L:ovk::s::b::", long_options, &options_index)) != -1) {
 	//you have to make sure to add any additional options to that ""
 		
 		switch (opt) {
@@ -82,14 +81,13 @@ int main(int argc, char* argv[]) {
 				cout << "  " << left << setw(25) << "-k,   --ssh-keys [path]"       << "Scan for world-writable SSH keys" << endl;
 				cout << "  " << left << setw(25) << "-b,   --suid [path]"           << "Scan for SUID binaries" << endl;
 				cout << "  " << left << setw(25) << "-a,   --all"		<< "Run all security audits" << endl;
-				cout << "  " << left << setw(25) << "-d,   --directory <path>" << "Check directory for changes" << endl;
+				cout << "  " << left << setw(25) << "-d,   --directory [path]" << "Check directory for changes" << endl;
 				cout << "  " << left << setw(25) << "-r,   --root"           << "Force scan starting at root" << endl;
 				cout << "  " << left << setw(25) << "-w,   --write-new"      << "Ignore saved timestamps" << endl;
 				cout << "  " << left << setw(25) << "-i,   --ignore-hidden"  << "Skip hidden files and folders" << endl;
 				cout << "  " << left << setw(25) << "-g,   --sudo-group"     << "List users with sudo privileges" << endl;
 				cout << "  " << left << setw(25) << "-U,   --system-update"  << "Check if system is up to date" << endl;
-				cout << "  " << left << setw(25) << "-L, --system-logs <word1,word2>" << "Parse /var/log/syslog for keywords" << endl;
-				cout << "  " << left << setw(25) << "-K, --kernel-logs <word1,word2>" << "Parse /var/log/kern.log for keywords" << endl;
+				cout << "  " << left << setw(25) << "-L, --parse-logs <word1,word2>" << "Parse logs for keywords" << endl;
 				cout << "  " << left << setw(25) << "-S,   --sudoers" << "Scan sudoers files for users with sudo access" << endl;
 				cout << "  " << left << setw(25) << "-o,   --log-dir <path>" << "Specify output directory for logs" << endl;
 				cout << "  " << left << setw(25) << "-v,   --verbose"        << "Enable verbose output (more detailed logs)" << endl;
@@ -162,6 +160,8 @@ int main(int argc, char* argv[]) {
 			
 				check_cron_jobs_verbose();
 				
+				check_sudoers_permission();
+				
 				//i'm choosing to not include directory case in this because it would require the --all flag to take an argument, which wouldn't really work if another one required an argument as well
 				
 				
@@ -181,19 +181,7 @@ int main(int argc, char* argv[]) {
 				while (getline(ss, word, ',')) {
 					keywords.push_back(word);
 				}
-				parse_system_logs(keywords, "system_log_report.txt");
-				break;
-			}
-
-			case 'K': {
-				string argument = optarg;
-				vector<string> keywords;
-				stringstream ss(argument);
-				string word;
-				while (getline(ss, word, ',')) {
-					keywords.push_back(word);
-				}
-				parse_kernel_logs(keywords, "kernel_log_report.txt");
+				parse_all_logs(keywords, logDir + "system_log_report.txt");
 				break;
 			}
 
