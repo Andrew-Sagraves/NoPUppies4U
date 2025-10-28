@@ -13,19 +13,11 @@ inspect Ubuntu's sources. It can run individual checks or all checks at once.
 .SH OPTIONS
 .TP
 .BR -h ", " --help
-Display a help message.
+Display this help message.
 
 .TP
 .BR -c ", " --crontab
-Check the system's crontab entries.
-
-.TP
-.BR -s ", " --sudo
-Check sudo permissions.
-
-.TP
-.BR -d ", " --directory
-Check directory for changes.
+Check crontab entries.
 
 .TP
 .BR -p ", " --path
@@ -33,20 +25,61 @@ Check the system's PATH for potential vulnerabilities.
 Results are written to \fBPATH.txt\fR.
 
 .TP
-.BR -x ", " --sources
-Check Ubuntu software sources.
+.BR -s ", " --sudo " [path]"
+Check for passwordless sudo access. Optionally specify a path to scan.
+
+.TP
+.BR -k ", " --ssh-keys " [path]"
+Scan the specified path for world-writable SSH keys.
+
+.TP
+.BR -b ", " --suid " [path]"
+Scan the specified path for SUID binaries.
 
 .TP
 .BR -a ", " --all
 Run all available checks.
 
-.SH EXAMPLES
-Run a PATH check:
-.RS
-nopuppies4u --path
-.RE
+.TP
+.BR -d ", " --directory " [path]"
+Check directory for changes since the last scan.
 
-Run all checks:
-.RS
-nopuppies4u --all
-.RE
+.TP
+.BR -r ", " --root
+Force scans to start at root (/).
+
+.TP
+.BR -w ", " --write-new
+Ignore saved timestamps and rewrite the audit.
+
+.TP
+.BR -i ", " --ignore-hidden
+Skip hidden files and folders during scan.
+
+.TP
+.BR -g ", " --sudo-group
+List users with sudo privileges.
+
+.TP
+.BR -U ", " --system-update
+Check if the system is up to date by checking sources.
+
+.TP
+.BR -L ", " --parse-logs " <word1,word2>"
+Parse system logs for the given keywords.
+
+.TP
+.BR -S ", " --sudoers
+Check sudoers files for users with sudo access.
+
+.TP
+.BR -o ", " --log-dir " <path>"
+Specify an output directory for logs and scan results.
+
+.TP
+.BR -v ", " --verbose
+Enable verbose output for more detailed logs.
+
+.TP
+.BR -x ", " --sources
+Check Ubuntu software sources for issues.
