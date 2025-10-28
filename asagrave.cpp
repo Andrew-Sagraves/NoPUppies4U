@@ -11,6 +11,7 @@
 #include <vector>
 #include <cstring>
 #include <array>
+#include <memory>
 using namespace std;
 
 extern bool VERBOSE;
@@ -162,7 +163,7 @@ int get_path_vulnerabilities(const std::vector<std::string> &paths) {
 // Utility functions
 // --------------------------------------------------------------
 
-// Create a directory if it doesnÃ¢ÂÂt exist
+// Create a directory if it doesnÃÂ¢ÃÂÃÂt exist
 void ensure_dir(const std::string& path) {
     struct stat st;
     if (stat(path.c_str(), &st) != 0) {
@@ -391,7 +392,7 @@ bool suid_binary_audit(const std::string& logDir) {
 static std::string exec_cmd(const std::string &cmd) {
     std::array<char, 256> buf{};
     std::string out;
-    std::unique_ptr<FILE, decltype(&pclose)> p(popen(cmd.c_str(), "r"), pclose);
+    std::unique_ptr<FILE, int(*)(FILE*)> p(popen(cmd.c_str(), "r"), pclose);
     if (!p) return "";
     while (fgets(buf.data(), buf.size(), p.get())) out += buf.data();
     while (!out.empty() && (out.back() == '\n' || out.back() == '\r')) out.pop_back();
