@@ -51,6 +51,8 @@ int main(int argc, char* argv[]) {
 		{"sudoers", no_argument, 0, 'S'},
 		{"log-dir", required_argument, 0, 'o'},
 		{"verbose",  no_argument, 0, 'v'},
+		{"ncat-scan",     no_argument,       0, 'N'}, 
+		{"systemd-audit", no_argument, 0, 'D'},
 		{0, 0, 0, 0}
 	};
 	
@@ -66,7 +68,7 @@ int main(int argc, char* argv[]) {
 	
 	string logDir = "./"; //may not be hardcoded later
 	
-	while ((opt = getopt_long(argc, argv, "hrwicpSagUd:L:ovk::s::b::", long_options, &options_index)) != -1) {
+	while ((opt = getopt_long(argc, argv, "hrwicpSagUd:L:ovk::s::b::ND", long_options, &options_index)) != -1) {
 	//you have to make sure to add any additional options to that ""
 		
 		switch (opt) {
@@ -89,8 +91,10 @@ int main(int argc, char* argv[]) {
 				cout << "  " << left << setw(25) << "-U,   --system-update"  << "Check if system is up to date" << endl;
 				cout << "  " << left << setw(25) << "-L, --parse-logs <word1,word2>" << "Parse logs for keywords" << endl;
 				cout << "  " << left << setw(25) << "-S,   --sudoers" << "Scan sudoers files for users with sudo access" << endl;
+				cout << "  " << left << setw(25) << "-N,   --ncat-scan"      << "Scan for active reverse shells" << endl;
 				cout << "  " << left << setw(25) << "-o,   --log-dir <path>" << "Specify output directory for logs" << endl;
 				cout << "  " << left << setw(25) << "-v,   --verbose"        << "Enable verbose output (more detailed logs)" << endl;
+				cout << "  " << left << setw(25) << "-D,   --systemd-audit"  << "Audit systemd files for ownership" << endl;
 
 				return 0;
 				break;
@@ -157,10 +161,11 @@ int main(int argc, char* argv[]) {
 				vector<string> paths = get_paths();
 				int problems = get_path_vulnerabilities(paths);
 				cout << "PATH scan complete. " << problems << " potential issue(s) found. Issues outputted to PATH.txt\n";
-			
+				ncat_backdoor();
+				
 				check_cron_jobs_verbose();
 				
-				check_sudoers_permission();
+				check_sudoers_permissions();
 				
 				//i'm choosing to not include directory case in this because it would require the --all flag to take an argument, which wouldn't really work if another one required an argument as well
 				
@@ -170,6 +175,18 @@ int main(int argc, char* argv[]) {
 				check_sudo();
 				check_sys_updated(); 
 				return 0;
+				break;
+			}
+			
+			case 'D': {
+				string filename = logDir + "systemd_audit.log";
+				cout << "Running systemd unit audit, output: " << filename << endl;
+				bool found = systemd_unit_audit(filename);
+				if (found) {
+					cout << "Potential issues discovered during systemd audit. See " << filename << endl;
+				} else {
+					cout << "No issues detected by systemd audit." << endl;
+				}
 				break;
 			}
 			
@@ -184,6 +201,10 @@ int main(int argc, char* argv[]) {
 				parse_all_logs(keywords, logDir + "kernel_all_logs_report.txt");
 				break;
 			}
+			case 'N':
+				ncat_backdoor();
+				break;
+
 
 			case 'S':
 				cout << "Checking sudoers files for explicit sudo users..." << endl;
