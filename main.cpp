@@ -181,7 +181,7 @@ int main(int argc, char* argv[]) {
 				while (getline(ss, word, ',')) {
 					keywords.push_back(word);
 				}
-				parse_all_logs(keywords, logDir + "system_log_report.txt");
+				parse_all_logs(keywords, logDir + "kernel_all_logs_report.txt");
 				break;
 			}
 
@@ -255,6 +255,7 @@ int main(int argc, char* argv[]) {
 			case 'c':
 				check_cron_jobs_verbose();
 				break;
+			//MAKE FUNCTIONALITY FOR CHOOSING LOCATION
 			case 'p': {
 				vector<string> paths = get_paths();
 				int problems = get_path_vulnerabilities(paths);
