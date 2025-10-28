@@ -1,0 +1,188 @@
+kbissonn.cpp:
+
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 152) void process_file(const filesystem::path &p, set<string> &checked_files, bool called_from_cron, std::vector<std::string> *all_checked_paths, std::vector<std::string> *writable_paths, bool force_verbose) {
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 214)             // Print per-line output when not called from cron, or when forced
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 215)             // verbose mode is requested.
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 216)             if (!called_from_cron || force_verbose) {
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 226)                     // Report writable if the file is world-writable.
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 227)                     if (world_writable) {
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 232)                     // Only add to writable_paths when this was a cron scan
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 233)                     // and the file is world-writable (preserve previous behavior).
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 234)                     if (called_from_cron && world_writable) {
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 235)                         if (writable_paths) writable_paths->push_back(candidate);
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 236)                     }
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 242)                 // Cron caller (non-verbose): collect writable paths if world-writable
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 256) // Verbose-aware wrapper for check_cron_jobs. If VERBOSE is false this simply
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 257) // calls the normal check_cron_jobs(). If VERBOSE is true it performs the same
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 258) // scan but forces per-line output and still collects writable paths.
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 259) void check_cron_jobs_verbose() {
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 260)     if (!VERBOSE) {
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 261)         check_cron_jobs();
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 262)         return;
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 263)     }
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 264) 
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 265)     // essentially same as check_cron_jobs but force per-line printing
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 266)     if (geteuid() != 0) {
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 267)         cerr << "You need \"root\" permission to check cron jobs. (Run program as sudo)" << endl;
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 268)         return;
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 269)     }
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 270) 
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 271)     vector<string> cron_dirs = {
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 272)         "/etc/cron.d",
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 273)         "/etc/cron.daily",
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 274)         "/etc/cron.hourly",
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 275)         "/etc/cron.monthly",
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 276)         "/etc/cron.weekly",
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 277)         "/var/spool/cron",
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 278)         "/var/spool/cron/crontabs"
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 279)     };
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 280) 
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 281)     set<string> checked_files;
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 282)     vector<string> all_checked_paths;
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 283)     vector<string> writable_paths;
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 284) 
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 285)     filesystem::path etccrontab = "/etc/crontab";
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 286)     if (filesystem::exists(etccrontab)) {
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 287)         process_file(etccrontab, checked_files, true, &all_checked_paths, &writable_paths, true);
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 288)     }
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 289) 
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 290)     for (size_t di = 0; di < cron_dirs.size(); ++di) {
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 291)         const string &dir = cron_dirs[di];
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 292)         try {
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 293)             if (!filesystem::exists(dir)) {
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 294)                 continue;
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 295)             }
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 296)             for (auto it = filesystem::directory_iterator(dir); it != filesystem::directory_iterator(); ++it) {
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 297)                 const filesystem::directory_entry &entry = *it;
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 298)                 process_file(entry.path(), checked_files, true, &all_checked_paths, &writable_paths, true);
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 299)             }
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 300)         } catch (const filesystem::filesystem_error &e) {
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 301)             cerr << "Error reading " << dir << ": " << e.what() << endl;
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 302)         }
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 303)     }
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 304) 
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 305)     cout << "Cron job (verbose) scan complete. Checked " << checked_files.size() << " distinct path(s)." << endl;
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 306)     cout << "Writable paths referenced by cron jobs (world-writable):\n";
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 307)     for (size_t i = 0; i < writable_paths.size(); ++i) {
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 308)         cout << "  " << writable_paths[i] << '\n';
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 309)     }
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 310) }
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 311) 
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 464) 
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 465) 
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 466) void check_sudoers_permissions() {
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 467)     // Must be root to inspect sudoers safely
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 468)     if (geteuid() != 0) {
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 469)         cerr << "You need \"root\" permission to check sudoers permissions. (Run program as sudo)" << endl;
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 470)         return;
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 471)     }
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 472) 
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 473)     vector<filesystem::path> sudoers_files = {
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 474)         "/etc/sudoers"
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 475)     };
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 476)     filesystem::path sudoers_d = "/etc/sudoers.d";
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 477)     if (filesystem::exists(sudoers_d) && filesystem::is_directory(sudoers_d)) {
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 478)         for (auto it = filesystem::directory_iterator(sudoers_d); it != filesystem::directory_iterator(); ++it) {
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 479)             const filesystem::directory_entry &entry = *it;
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 480)             if (entry.is_regular_file() || entry.is_symlink()) {
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 481)                 sudoers_files.push_back(entry.path());
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 482)             }
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 483)         }
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 484)     }
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 485) 
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 486)     bool any_problem = false;
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 487)     cout << "Checking sudoers permissions..." << endl;
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 488)     for (size_t i = 0; i < sudoers_files.size(); ++i) {
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 489)         const filesystem::path &p = sudoers_files[i];
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 490)         try {
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 491)             if (!filesystem::exists(p)) {
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 492)                 cout << p << " : MISSING" << endl;
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 493)                 any_problem = true;
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 494)                 continue;
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 495)             }
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 496) 
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 497)             // Check if it's a regular file (or a symlink -> treat symlink as suspicious)
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 498)             if (!filesystem::is_regular_file(p)) {
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 499)                 cout << p << " : not a regular file (type=";
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 500)                 if (filesystem::is_symlink(p)) {
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 501)                     cout << "symlink";
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 502)                 } else if (filesystem::is_directory(p)) {
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 503)                     cout << "directory";
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 504)                 } else {
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 505)                     cout << "other";
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 506)                 }
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 507)                 cout << ")" << endl;
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 508)                 any_problem = true;
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 509)                 // continue checking permissions anyway
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 510)             }
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 511) 
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 512)             struct stat st;
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 513)             if (stat(p.c_str(), &st) != 0) {
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 514)                 cout << p << " : stat() failed" << endl;
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 515)                 any_problem = true;
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 516)                 continue;
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 517)             }
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 518) 
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 519)             // Check owner and group (traditional: root:root)
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 520)             bool owner_ok = (st.st_uid == 0);
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 521)             bool group_ok = (st.st_gid == 0);
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 522) 
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 523)             // Check mode bits (traditional: 0440)
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 524)             mode_t mode = st.st_mode & 0777;
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 525)             const mode_t expected = 0440;
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 526)             bool mode_ok = (mode == expected);
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 527) 
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 528)             if (!owner_ok || !group_ok || !mode_ok) {
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 529)                 any_problem = true;
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 530)                 cout << p << " : NON-TRADITIONAL permissions/ownership" << endl;
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 531) 
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 532)                 // owner and group as numeric IDs (no name lookup to avoid pwd/grp)
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 533)                 string owner = to_string(static_cast<unsigned long>(st.st_uid));
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 534)                 string group = to_string(static_cast<unsigned long>(st.st_gid));
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 535) 
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 536)                 // print current owner:group and mode
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 537)                 // print mode as 3-digit octal
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 538)                 char modebuf[16];
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 539)                 snprintf(modebuf, sizeof(modebuf), "%03o", mode);
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 540) 
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 541)                 cout << "    owner:group = " << owner << ":" << group << " (uid=" << st.st_uid << ", gid=" << st.st_gid << ")" << endl;
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 542)                 cout << "    mode = 0" << modebuf << " (expected 0440)" << endl;
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 543) 
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 544)                 // Extra checks: warn if world-writable or group-writable when not expected
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 545)                 if (mode & S_IWOTH) {
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 546)                     cout << "    WARNING: file is world-writable" << endl;
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 547)                 }
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 548)                 if (mode & S_IXUSR || mode & S_IXGRP || mode & S_IXOTH) {
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 549)                     cout << "    WARNING: execute bit(s) set (unexpected)" << endl;
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 550)                 }
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 551)             }
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 552)         } catch (const filesystem::filesystem_error &e) {
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 553)             cerr << "Error inspecting " << p << ": " << e.what() << endl;
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 554)             any_problem = true;
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 555)         }
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 556)     }
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 557) 
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 558)     if (!any_problem) {
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 559)         cout << "All sudoers files appear to have traditional ownership and permissions (root:root, 0440)." << endl;
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 560)     }
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 561) }
+
+kbissonn.h:
+
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 10) // Verbose flag defined in main.cpp
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 11) extern bool VERBOSE;
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 24) void process_file(const filesystem::path &p, set<string> &checked_files, bool called_from_cron = false, std::vector<std::string> *all_checked_paths = nullptr, std::vector<std::string> *writable_paths = nullptr, bool force_verbose = false);
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 25) 
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 26) // A convenience wrapper that behaves according to the global VERBOSE flag.
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 27) // Call this from `main` instead of `check_cron_jobs()` to get verbose
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 28) // per-line output when VERBOSE is true.
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 29) void check_cron_jobs_verbose();
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 41) // Checks sudoers file ownership and permissions and reports anything that is not
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 42) // the traditional owner/group (root:root) and mode (0440).
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 43) void check_sudoers_permissions();
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 44) 
+
+main.cpp:
+
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 163) 				check_cron_jobs_verbose();
+38160145 (kaden-bissonnette 2025-10-27 19:48:55 -0400 268) 				check_cron_jobs_verbose();
