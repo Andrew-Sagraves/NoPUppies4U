@@ -1,0 +1,403 @@
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400   1) #include "asagrave.h"
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400   2) #include <dirent.h>
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400   3) #include <fstream>
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400   4) #include <iostream>
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400   5) #include <sstream>
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400   6) #include <string>
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400   7) #include <sys/stat.h>
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400   8) #include <sys/types.h>
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400   9) #include <unistd.h>
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400  10) #include <unordered_map>
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  11) #include <vector>
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400  13) #include <array>
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  18) 
+fbd494b5 (asagrave 2025-09-25 08:37:20 -0400  19) // Retrieve PATH entries as a vector of strings
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  20) std::vector<std::string> get_paths() {
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  21)   std::vector<std::string> paths;
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  22)   const char *path_env = getenv("PATH");
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  23)   if (!path_env)
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  24)     return paths;
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  25) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  26)   std::string path_str(path_env);
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  27)   std::stringstream ss(path_str);
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  28)   std::string dir;
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  29)   while (std::getline(ss, dir, ':')) {
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  30)     paths.push_back(dir); // keep empty entries (treated as ".")
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  31)   }
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  32)   return paths;
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  33) }
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  34) 
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  35) // Check if a directory (and its parents) are world-writable
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  36) bool pathutil_is_world_writable_dir(const std::string &dir) {
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  37)   if (dir.empty())
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  38)     return false;
+d5396114 (asagrave 2025-09-25 08:41:38 -0400  39) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  40)   std::string path = dir;
+d5396114 (asagrave 2025-09-25 08:41:38 -0400  41) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  42)   // Remove trailing slashes
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  43)   while (path.length() > 1 && path.back() == '/') {
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  44)     path.pop_back();
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  45)   }
+d5396114 (asagrave 2025-09-25 08:41:38 -0400  46) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  47)   struct ::stat st;
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  48) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  49)   while (!path.empty()) {
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  50)     if (stat(path.c_str(), &st) == -1)
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  51)       return false;
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  52)     if (S_ISDIR(st.st_mode) && (st.st_mode & S_IWOTH))
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  53)       return true;
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  54) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  55)     if (path == "/")
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  56)       break; // root reached
+d5396114 (asagrave 2025-09-25 08:41:38 -0400  57) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  58)     auto pos = path.find_last_of('/');
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  59)     if (pos == std::string::npos)
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  60)       break;
+d5396114 (asagrave 2025-09-25 08:41:38 -0400  61) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  62)     if (pos == 0)
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  63)       path = "/";
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  64)     else
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  65)       path = path.substr(0, pos);
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  66)   }
+d5396114 (asagrave 2025-09-25 08:41:38 -0400  67) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  68)   return false;
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  69) }
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  70) 
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400  71) // Check if directory string is relative
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  72) bool pathutil_is_relative_dir(const std::string &dir) {
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  73)   if (dir.empty() || dir == ".")
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  74)     return true;
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  75)   return dir[0] != '/';
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  76) }
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  77) 
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400  78) // Check if a directory or its files have vulnerabilities
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  79) PathVulnResult pathutil_dir_has_vulnerability(const std::string &dir) {
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  80)   std::string effective = dir.empty() ? "." : dir;
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  81) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  82)   if (pathutil_is_relative_dir(effective)) {
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  83)     return {true, "Relative directory"};
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  84)   }
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  85) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  86)   if (pathutil_is_world_writable_dir(effective)) {
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  87)     return {true, "World-writable directory (or parent)"};
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  88)   }
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400  89) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  90)   // Scan files inside the directory for world-writable files
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  91)   DIR *dp = opendir(effective.c_str());
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  92)   if (!dp)
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  93)     return {false, ""};
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  94) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  95)   struct dirent *entry;
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  96)   struct ::stat st;
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  97)   std::string filepath;
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  98) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400  99)   while ((entry = readdir(dp)) != nullptr) {
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 100)     filepath = effective + "/" + entry->d_name;
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 101)     if (stat(filepath.c_str(), &st) == -1)
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 102)       continue;
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 103)     if (S_ISREG(st.st_mode) && (st.st_mode & S_IWOTH)) {
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 104)       closedir(dp);
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 105)       return {true, "World-writable file: " + filepath};
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400 106)     }
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 107)   }
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 108) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 109)   closedir(dp);
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 110)   return {false, ""};
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 111) }
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400 112) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 113) // Scan PATH entries and log vulnerabilities, including duplicate executables
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 114) int get_path_vulnerabilities(const std::vector<std::string> &paths) {
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 115)   std::ofstream report("PATH.txt");
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 116)   int problems = 0;
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 117) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 118)   // Map to track executable names -> first directory seen
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 119)   std::unordered_map<std::string, std::string> exe_map;
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 120) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 121)   for (const auto &dir : paths) {
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 122)     PathVulnResult result = pathutil_dir_has_vulnerability(dir);
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 123)     if (result.vulnerable) {
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 124)       report << "[!] " << result.reason << " (" << (dir.empty() ? "." : dir)
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 125)              << ")\n";
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 126)       problems++;
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400 127)     }
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400 128) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 129)     // Scan executables for duplicates
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 130)     std::string effective = dir.empty() ? "." : dir;
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 131)     DIR *dp = opendir(effective.c_str());
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 132)     if (!dp)
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 133)       continue;
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 134) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 135)     struct dirent *entry;
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 136)     struct ::stat st;
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 137)     std::string filepath;
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 138) 
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 139)     while ((entry = readdir(dp)) != nullptr) {
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 140)       filepath = effective + "/" + entry->d_name;
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 141)       if (stat(filepath.c_str(), &st) == -1)
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 142)         continue;
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 143) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 144)       if (S_ISREG(st.st_mode) && (st.st_mode & S_IXUSR)) {
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 145)         std::string exe_name = entry->d_name;
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 146)         if (exe_map.find(exe_name) != exe_map.end()) {
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 147)           report << "[!] Duplicate executable: " << exe_name << " found in "
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 148)                  << effective << " (also in " << exe_map[exe_name] << ")\n";
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 149)           problems++;
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 150)         } else {
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 151)           exe_map[exe_name] = effective;
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 152)         }
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 153)       }
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 154)     }
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 155) 
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 156)     closedir(dp);
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 157)   }
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 158) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 159)   report.close();
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 160)   return problems;
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400 161) }
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 162) // --------------------------------------------------------------
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 163) // Utility functions
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 164) // --------------------------------------------------------------
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400 165) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 167) void ensure_dir(const std::string& path) {
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 168)     struct stat st;
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 169)     if (stat(path.c_str(), &st) != 0) {
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 170)         mkdir(path.c_str(), 0755);
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 171)     }
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 172) }
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 173) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 174) // Append a line to a log file
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 175) void write_log(const std::string& file, const std::string& message) {
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 176)     std::ofstream out(file.c_str(), std::ios::app);
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 177)     if (out.is_open()) {
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 178)         out << message << "\n";
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 179)     }
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 180) }
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 181) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 182) // Simple recursive directory traversal using POSIX API
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 183) void list_files_recursive(const std::string& base, std::vector<std::string>& files) {
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 184)     DIR* dir = opendir(base.c_str());
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 185)     if (!dir) return;
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 186) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 187)     struct dirent* entry;
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 188)     while ((entry = readdir(dir)) != NULL) {
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 189)         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 190)             continue;
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 191) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 192)         std::string fullpath = base + "/" + entry->d_name;
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 193)         struct stat st;
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 194)         if (lstat(fullpath.c_str(), &st) == 0) {
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 195)             if (S_ISDIR(st.st_mode)) {
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 196)                 list_files_recursive(fullpath, files);
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 197)             } else if (S_ISREG(st.st_mode)) {
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 198)                 files.push_back(fullpath);
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 199)             }
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 200)         }
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 201)     }
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 202)     closedir(dir);
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 203) }
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 204) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 205) // --------------------------------------------------------------
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 206) // 1. Passwordless sudo access check
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 207) // --------------------------------------------------------------
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 208) bool passwordless_sudo_access(const std::string& logDir) {
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 215)     write_log(logFile, "=== Checking for passwordless SUDO access ===");
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 216) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 217)     bool found = false;
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 218)     const char* username = getenv("USER");
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 219)     if (!username) username = "UNKNOWN";
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 220) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 222)     sudoFiles.push_back("/etc/sudoers");
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 223) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 224)     // Include any files under /etc/sudoers.d
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 225)     DIR* d = opendir("/etc/sudoers.d");
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 226)     if (d) {
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 227)         struct dirent* e;
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 228)         while ((e = readdir(d)) != NULL) {
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 229)             if (e->d_name[0] == '.') continue;
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 231)         }
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 232)         closedir(d);
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 233)     }
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 234) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 235)     for (size_t i = 0; i < sudoFiles.size(); ++i) {
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 236) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 254)                 found = true;
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 260)                 write_log(logFile, "Passwordless sudo entry found in: " + sudoFiles[i]);
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 261)                 write_log(logFile, "  -> " + line);
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 262)             }
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400 263)         }
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 264)     }
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 265) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 267)         write_log(logFile, "No passwordless sudo entries found.");
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 273) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 274)     return found;
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 275) }
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 276) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 277) // --------------------------------------------------------------
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 278) // 2. World-writable SSH keys
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 279) // --------------------------------------------------------------
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 280) bool world_writable_ssh_keys(const std::string& logDir) {
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 287)     write_log(logFile, "=== Checking for world-writable SSH keys ===");
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 288) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 289)     bool found = false;
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 290)     std::vector<std::string> sshDirs;
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 291) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 292)     const char* home = getenv("HOME");
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 293)     if (home) {
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 294)         sshDirs.push_back(std::string(home) + "/.ssh");
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 295)     }
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 296)     sshDirs.push_back("/etc/ssh");
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 297) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 298)     for (size_t i = 0; i < sshDirs.size(); ++i) {
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 304)         std::vector<std::string> files;
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 305)         list_files_recursive(sshDirs[i], files);
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 306)         for (size_t j = 0; j < files.size(); ++j) {
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 307)             struct stat st;
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 308)             if (stat(files[j].c_str(), &st) == 0) {
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 309)                 if (st.st_mode & S_IWOTH) {
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 310)                     found = true;
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 316)                     write_log(logFile, "World-writable SSH file: " + files[j]);
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 317)                 }
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 318)             }
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 319)         }
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 320)     }
+8c97c913 (asagrave 2025-09-25 08:50:16 -0400 321) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 323)         write_log(logFile, "No world-writable SSH keys found.");
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 329) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 330)     return found;
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 331) }
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 332) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 334) // --------------------------------------------------------------
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 335) // 3. SUID binary audit
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 336) // --------------------------------------------------------------
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 337) bool suid_binary_audit(const std::string& logDir) {
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 344)     write_log(logFile, "=== Scanning for SUID binaries ===");
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 345) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 346)     bool found = false;
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 347)     int count = 0;
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 348) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 349)     std::vector<std::string> dirs;
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 350)     dirs.push_back("/bin");
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 351)     dirs.push_back("/sbin");
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 352)     dirs.push_back("/usr/bin");
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 353)     dirs.push_back("/usr/sbin");
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 354)     dirs.push_back("/usr/local/bin");
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 355)     dirs.push_back("/usr/local/sbin");
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 356)     dirs.push_back("/opt");
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 357) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 358)     for (size_t i = 0; i < dirs.size(); ++i) {
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 364)         std::vector<std::string> files;
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 365)         list_files_recursive(dirs[i], files);
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 366)         for (size_t j = 0; j < files.size(); ++j) {
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 367)             struct stat st;
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 368)             if (lstat(files[j].c_str(), &st) == 0) {
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 369)                 if (st.st_mode & S_ISUID) {
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 370)                     found = true;
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 371)                     count++;
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 377)                     write_log(logFile, "SUID binary: " + files[j]);
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 378)                 }
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 379)             }
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 380)         }
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400 381)     }
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400 382) 
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 383)     write_log(logFile, "Total SUID binaries found: " + std::to_string(count));
+ccebbb88 (asagrave 2025-10-13 18:05:10 -0400 389)     return found;
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400 390) }
+c0ab5045 (asagrave 2025-09-25 08:07:33 -0400 391) 
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 392) static std::string exec_cmd(const std::string &cmd) {
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 393)     std::array<char, 256> buf{};
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 394)     std::string out;
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 396)     if (!p) return "";
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 397)     while (fgets(buf.data(), buf.size(), p.get())) out += buf.data();
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 398)     while (!out.empty() && (out.back() == '\n' || out.back() == '\r')) out.pop_back();
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 399)     return out;
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 400) }
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 401) 
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 402) static bool stat_path(const std::string &p, uid_t &u, gid_t &g, mode_t &m) {
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 403)     struct stat st; if (stat(p.c_str(), &st)) return false;
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 404)     u = st.st_uid; g = st.st_gid; m = st.st_mode; return true;
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 405) }
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 406) 
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 407) static bool is_writable_by_nonroot(const std::string &p) {
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 408)     uid_t u; gid_t g; mode_t m; if (!stat_path(p,u,g,m)) return false;
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 409)     return ((m&S_IWUSR && u) || (m&S_IWGRP && g) || (m&S_IWOTH));
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 410) }
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 411) 
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 412) static std::string md5(const std::string &p) {
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 413)     return exec_cmd("md5sum '" + p + "' 2>/dev/null | awk '{print $1}'");
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 414) }
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 415) 
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 416) static void log_line(const std::string &f, const std::string &l) {
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 417)     std::ofstream o(f,std::ios::app); if(o) o<<l<<'\n';
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 418) }
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 419) 
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 420) /* -------- SUID / Package ownership audit -------- */
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 421) bool suid_package_audit(const std::string &log) {
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 422)     bool issues=false;
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 423)     log_line(log,"=== SUID/SGID package audit ===");
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 424)     std::istringstream s(exec_cmd("find / -xdev -type f \\( -perm -4000 -o -perm -2000 \\) -print 2>/dev/null"));
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 425)     for(std::string f; std::getline(s,f);){
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 426)         uid_t u; gid_t g; mode_t m;
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 427)         if(!stat_path(f,u,g,m)) continue;
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 428)         std::string pkg,sys=""; 
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 429)         std::string d=exec_cmd("dpkg -S '"+f+"' 2>/dev/null|head -1");
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 430)         if(d.find(':')!=std::string::npos){pkg=d.substr(0,d.find(':'));sys="dpkg";}
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 431)         else {
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 432)             std::string r=exec_cmd("rpm -qf '"+f+"' 2>/dev/null");
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 433)             if(r.find("not owned")==std::string::npos){pkg=r;sys="rpm";}
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 434)         }
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 435)         std::ostringstream ev;
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 436)         ev<<"File:"<<f<<" perms:"<<std::oct<<(m&07777)<<std::dec;
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 437)         if(pkg.empty()){
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 438)             log_line(log,ev.str()+" | pkg:(none) => suspicious"); issues=true; continue;
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 439)         }
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 440)         bool bad=false;
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 441)         if(sys=="dpkg"){
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 442)             std::string info="/var/lib/dpkg/info/"+pkg+".md5sums";
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 443)             std::string ref=exec_cmd("grep -F ' "+f+"' '"+info+"' 2>/dev/null|awk '{print $1}'");
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 444)             std::string local=md5(f);
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 445)             if(!ref.empty()&&!local.empty()&&ref!=local) bad=true;
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 446)         } else if(sys=="rpm"){
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 447)             bad=!exec_cmd("rpm -Vf '"+f+"' 2>/dev/null").empty();
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 448)         }
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 449)         log_line(log,ev.str()+" pkg:"+pkg+(bad?" => modified":" => ok"));
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 450)         if(bad) issues=true;
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 451)     }
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 452)     log_line(log,"=== End SUID/SGID audit ===");
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 453)     return issues;
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 454) }
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 455) 
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 456) /* -------- systemd unit audit -------- */
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 457) bool systemd_unit_audit(const std::string &log) {
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 458)     bool issues=false;
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 459)     log_line(log,"=== systemd unit audit ===");
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 460)     std::vector<std::string> dirs={"/etc/systemd/system","/lib/systemd/system","/usr/lib/systemd/system","/run/systemd/system"};
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 461)     std::vector<std::string> units;
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 462)     for(auto &d:dirs){
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 463)         std::istringstream s(exec_cmd("find '"+d+"' -type f \\( -name '*.service' -o -name '*.timer' \\) -print 2>/dev/null"));
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 464)         for(std::string u;std::getline(s,u);) if(!u.empty()) units.push_back(u);
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 465)     }
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 466)     for(auto &u:units){
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 467)         uid_t uid; gid_t gid; mode_t mode;
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 468)         if(stat_path(u,uid,gid,mode)&&uid){
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 469)             log_line(log,"non-root owned unit:"+u); issues=true;
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 470)         }
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 471)         auto pos=u.find_last_of('/'); std::string dir=u.substr(0,pos);
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 472)         if(is_writable_by_nonroot(dir)){log_line(log,"unit dir writable:"+dir); issues=true;}
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 473)         std::ifstream f(u); if(!f) continue;
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 474)         std::string line;
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 475)         while(std::getline(f,line)){
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 476)             std::string t=line; t.erase(0,t.find_first_not_of(" \t"));
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 477)             if(t.rfind("ExecStart",0)&&t.rfind("ExecStartPre",0)&&t.rfind("ExecStartPost",0)) continue;
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 478)             auto eq=t.find('='); if(eq==std::string::npos) continue;
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 479)             std::string cmd=t.substr(eq+1);
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 480)             std::istringstream ss(cmd); std::string exe; ss>>exe;
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 481)             if(exe.empty()||exe[0]!='/') continue;
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 482)             std::string parent=exe.substr(0,exe.find_last_of('/'));
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 483)             if(is_writable_by_nonroot(parent)||is_writable_by_nonroot(exe)||exe.find("/tmp/")==0){
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 484)                 log_line(log,"risk Exec:"+exe+" in "+u); issues=true;
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 485)             }
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 486)         }
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 487)     }
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 488)     log_line(log,"=== End systemd audit ===");
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 489)     return issues;
+bc1921ea (asagrave 2025-10-27 17:05:41 -0400 490) }
