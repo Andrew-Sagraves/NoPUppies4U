@@ -289,7 +289,8 @@ int main(int argc, char* argv[]) {
 			}
 			case '?': 
 				//apparently occurs when it gets an unknown flag? 
-				cerr << "Error: invalid argument '" << argv[optind - 1] << "'\n";  
+				cerr << "Error: invalid argument \'" << argv[optind - 1] << "\'\n"; 
+				break; 
 			default:
 				return 1;
 		}
