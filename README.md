@@ -7,11 +7,11 @@
 - Harrison Clark:    hclark37
 
 ## Logo
-<img width="1024" height="1024" alt="image" src="https://github.com/user-attachments/assets/64071203-8238-4436-bfb6-3cba23ba1c3a" />
+<img width="512" height="512" alt="image" src="https://github.com/user-attachments/assets/64071203-8238-4436-bfb6-3cba23ba1c3a" />
 
 
 ## Product Description
-Pull from Andrew's assignments from the beginning of the year (should already be done)
+NoPUppies4U is a light-weight red/blue team tool that will scan your filesystem for common misconfigurations and vulnerabilities. This project looks at cronjobs and the permission for the files that all the cronjobs look at, looking at the currently issued ssh-keys, and much more (see `nopuppies4u -h` for full list of functionality). This project will produce output to .txt files or directly to the terminal dependent on the function called. It can also be installed/uninstalled to match normal unix utility as any other unix function (like `ls`).
 
 ## Instructions
 1. Pull the project from GitHub into your Ubuntu OS:
