@@ -7,6 +7,7 @@
 - Harrison Clark:    hclark37
 
 ## Logo
+<img width="1024" height="1024" alt="image" src="https://github.com/user-attachments/assets/64071203-8238-4436-bfb6-3cba23ba1c3a" />
 
 
 ## Product Description
