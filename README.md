@@ -15,20 +15,22 @@ Pull from Andrew's assignments from the beginning of the year (should already be
 
 ## Instructions
 1. Pull the project from GitHub into your Ubuntu OS:
-   run ```git clone https://github.com/Andrew-Sagraves/NoPUppies4U.git```
-2. Installing the project:
+   ```
+   git clone https://github.com/Andrew-Sagraves/NoPUppies4U.git
+   ```
+3. Installing the project:
    ```
    chmod u+x ./install.sh
    ./install.sh
    ```
-3. Compile the project using the Makefile:
+4. Compile the project using the Makefile:
    ```make```
-4. Running the project(Require use of sudo/root for certain commands):
+5. Running the project(Require use of sudo/root for certain commands):
    ```
    sudo nopuppies4u
-   #Use nopuppies4u -h for help
+   # Use nopuppies4u -h for help
    ```
-5. Look at the contents of PATH.txt for program output (cat PATH.txt)
-6. Logs are at "/var/log/NoPUppies4U/".
+6. Look at the contents of PATH.txt for program output (cat PATH.txt)
+7. Logs are at "/var/log/NoPUppies4U/".
 
 ## [License](https://github.com/Andrew-Sagraves/NoPUppies4U/blob/main/LICENSE)
