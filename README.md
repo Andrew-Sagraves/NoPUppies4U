@@ -33,4 +33,4 @@ NoPUppies4U is a light-weight red/blue team tool that will scan your filesystem 
 6. Look at the contents of PATH.txt for program output (cat PATH.txt)
 7. Logs are at "/var/log/NoPUppies4U/".
 
-## [License](https://github.com/Andrew-Sagraves/NoPUppies4U/blob/main/LICENSE)
+## [License](https://github.com/Andrew-Sagraves/NoPUppies4U/blob/main/LICENSE.txt)
