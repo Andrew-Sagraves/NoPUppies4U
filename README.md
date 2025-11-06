@@ -6,7 +6,7 @@
 - Bryan Mullins:     bmulli17
 - Harrison Clark:    hclark37
 
-## Logo:
+## Logo
 
 
 ## Product Description
