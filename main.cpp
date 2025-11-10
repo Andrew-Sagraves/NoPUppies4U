@@ -51,6 +51,7 @@ int main(int argc, char* argv[]) {
 		{"sudoers", no_argument, 0, 'S'},
 		{"log-dir", required_argument, 0, 'o'},
 		{"verbose",  no_argument, 0, 'v'},
+		{"suid-packages", no_argument, 0, 'P'},
 		{"ncat-scan",     no_argument,       0, 'N'}, 
 		{"systemd-audit", no_argument, 0, 'D'},
 		{0, 0, 0, 0}
@@ -68,7 +69,7 @@ int main(int argc, char* argv[]) {
 	
 	string logDir = "./"; //may not be hardcoded later
 	
-	while ((opt = getopt_long(argc, argv, "hrwicpSagUd:L:ovk::s::b::ND", long_options, &options_index)) != -1) {
+	while ((opt = getopt_long(argc, argv, "hrwicpSagUd:L:ovk::s::b::NDP", long_options, &options_index)) != -1)
 	//you have to make sure to add any additional options to that ""
 		
 		switch (opt) {
@@ -95,7 +96,7 @@ int main(int argc, char* argv[]) {
 				cout << "  " << left << setw(25) << "-o,   --log-dir <path>" << "Specify output directory for logs" << endl;
 				cout << "  " << left << setw(25) << "-v,   --verbose"        << "Enable verbose output (more detailed logs)" << endl;
 				cout << "  " << left << setw(25) << "-D,   --systemd-audit"  << "Audit systemd files for ownership" << endl;
-
+				cout << "  " << left << setw(25) << "-P,   --suid-packages" << "Scan for SUID binaries installed by packages" << endl;
 				return 0;
 				break;
 			case 'v':
@@ -157,12 +158,13 @@ int main(int argc, char* argv[]) {
 				world_writable_ssh_keys(logDir);
 				passwordless_sudo_access(logDir);
 				check_sources_list();
-				
+				suid_package_audit(logDir + "suid_packages.log");
 				vector<string> paths = get_paths();
 				int problems = get_path_vulnerabilities(paths);
 				cout << "PATH scan complete. " << problems << " potential issue(s) found. Issues outputted to PATH.txt\n";
 				ncat_backdoor();
-				
+				systemd_unit_audit(logDir + "systemd_audit.log");
+				check_sudoers();
 				check_cron_jobs_verbose();
 				
 				check_sudoers_permissions();
@@ -201,6 +203,21 @@ int main(int argc, char* argv[]) {
 				parse_all_logs(keywords, logDir + "kernel_all_logs_report.txt");
 				break;
 			}
+			
+			case 'P': {
+			    string filename = logDir + "suid_packages.log";
+			    cout << "Running SUID package audit, output: " << filename << endl;
+
+			    bool found = suid_package_audit(filename);
+
+			    if (found) {
+				cout << "Potential SUID package issues detected. See " << filename << endl;
+			    } else {
+				cout << "No SUID package issues found." << endl;
+			    }
+			    break;
+			}
+			
 			case 'N':
 				ncat_backdoor();
 				break;
