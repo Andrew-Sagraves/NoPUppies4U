@@ -56,7 +56,7 @@ int main(int argc, char* argv[]) {
 		{"systemd-audit", no_argument, 0, 'D'},
 		{0, 0, 0, 0}
 	};
-	
+
 	int opt = 0;
 	int options_index = 0;
 	
@@ -64,13 +64,13 @@ int main(int argc, char* argv[]) {
 		cout << "Usage: nopuppies4u [options]" << endl;
 		return 0;
 	}
-	
+
+	//used for bryan's code 
 	DirectoryCheckFlags dirFlags;
 	
-	string logDir = "./"; //may not be hardcoded later
+	string logDir = "./";
 	
 	while ((opt = getopt_long(argc, argv, "hrwicpSagUd:L:ovk::s::b::NDP", long_options, &options_index)) != -1)
-	//you have to make sure to add any additional options to that ""
 		
 		switch (opt) {
 			
@@ -90,7 +90,7 @@ int main(int argc, char* argv[]) {
 				cout << "  " << left << setw(25) << "-i,   --ignore-hidden"  << "Skip hidden files and folders" << endl;
 				cout << "  " << left << setw(25) << "-g,   --sudo-group"     << "List users with sudo privileges" << endl;
 				cout << "  " << left << setw(25) << "-U,   --system-update"  << "Check if system is up to date" << endl;
-				cout << "  " << left << setw(25) << "-L, --parse-logs <word1,word2>" << "Parse logs for keywords" << endl;
+				cout << "  " << left << setw(25) << "-L,   --parse-logs <word1,word2>" << "Parse logs for keywords" << endl;
 				cout << "  " << left << setw(25) << "-S,   --sudoers" << "Scan sudoers files for users with sudo access" << endl;
 				cout << "  " << left << setw(25) << "-N,   --ncat-scan"      << "Scan for active reverse shells" << endl;
 				cout << "  " << left << setw(25) << "-o,   --log-dir <path>" << "Specify output directory for logs" << endl;
@@ -99,23 +99,27 @@ int main(int argc, char* argv[]) {
 				cout << "  " << left << setw(25) << "-P,   --suid-packages" << "Scan for SUID binaries installed by packages" << endl;
 				return 0;
 				break;
+			
+			//enables global verbose - global variable that is read in other people's work 
 			case 'v':
 				VERBOSE = true;
 				cout << "Verbose mode enabled" << endl;
 				break;
 			
-			case 'o': {
+			case 'o': { //output directory
 				if (optarg == nullptr) {
 					cerr << "Error: --log-dir requires an argument" << endl;
 					return 1;
 				}
 				
 				logDir = optarg;
-				
+
+				//add trailing slash
 				if (!logDir.empty() && logDir[logDir.size() - 1] != '/') {
 					logDir += '/'; 
 				}
-				
+
+				//check if directory created and if not create it
 				struct stat st;
 				if (stat(logDir.c_str(), &st) != 0) {
 					cout << "Log directory does not exist. Creating: " << logDir << endl;
@@ -128,7 +132,7 @@ int main(int argc, char* argv[]) {
 					cerr << "Error: Provided path exists but is not a directory: " << logDir << endl;
 					return 1;
 				}
-				
+				//check permissions
 				if (access(logDir.c_str(), W_OK) != 0) {
 					cerr << "Error: No write permission for directory: " << logDir << endl;
 					return 1;
@@ -139,20 +143,20 @@ int main(int argc, char* argv[]) {
 				break;
 			}
 
-			case 'r':
+			case 'r': //force scan from root
 				dirFlags.rootCheck = true;
 				break;
 
-			case 'w':
+			case 'w': //ignore saved timestamps
 				dirFlags.writeNew = true;
 				break;
 
-			case 'i':
+			case 'i': //skip hidden files
 				dirFlags.ignoreHidden = true;
 				break;
 			
 			
-			case 'a': {
+			case 'a': { //do all audits
 				//add all your functions here- this is the "all" option
 				suid_binary_audit(logDir);
 				world_writable_ssh_keys(logDir);
@@ -171,7 +175,6 @@ int main(int argc, char* argv[]) {
 				
 				//i'm choosing to not include directory case in this because it would require the --all flag to take an argument, which wouldn't really work if another one required an argument as well
 				
-				
 				check_ufw();
 				
 				check_sudo();
@@ -179,7 +182,8 @@ int main(int argc, char* argv[]) {
 				return 0;
 				break;
 			}
-			
+
+			//systemd audit 
 			case 'D': {
 				string filename = logDir + "systemd_audit.log";
 				cout << "Running systemd unit audit, output: " << filename << endl;
@@ -191,7 +195,8 @@ int main(int argc, char* argv[]) {
 				}
 				break;
 			}
-			
+
+			//parse logs for keywords
 			case 'L': { 
 				string argument = optarg; 
 				vector<string> keywords;
@@ -203,7 +208,8 @@ int main(int argc, char* argv[]) {
 				parse_all_logs(keywords, logDir + "kernel_all_logs_report.txt");
 				break;
 			}
-			
+
+			//suid package audit
 			case 'P': {
 			    string filename = logDir + "suid_packages.log";
 			    cout << "Running SUID package audit, output: " << filename << endl;
@@ -217,29 +223,34 @@ int main(int argc, char* argv[]) {
 			    }
 			    break;
 			}
-			
+
+			//ncat backdoor scan
 			case 'N':
 				ncat_backdoor();
 				break;
 
-
+			//check sudoers file
 			case 'S':
 				cout << "Checking sudoers files for explicit sudo users..." << endl;
 				check_sudoers();
 				break;
-			
+
+			//list users with sudo privileges
 			case 'g':  
 				check_sudo();
 				break;
 
+			//check system updates
 			case 'U':  
 				check_sys_updated();
 				break;
 
+			//check sources list (unused in help)
 			case 'x':
 				check_sources_list();
 				break;
-			
+
+			//suid binary scan
 			case 'b': {
 				string filename;
 
@@ -252,8 +263,8 @@ int main(int argc, char* argv[]) {
 				suid_binary_audit(logDir + filename);
 				break;
 			}
-
-
+	
+			//scan world-writable ssh keys
 			case 'k': {
 				string filename;
 
@@ -267,7 +278,7 @@ int main(int argc, char* argv[]) {
 				break;
 			}
 
-
+			//check passwordless sudo access
 			case 's': {
 				string filename;
 
@@ -280,7 +291,8 @@ int main(int argc, char* argv[]) {
 				passwordless_sudo_access(logDir + filename);
 				break;
 			}
-			
+
+			//check directory for changes
 			case 'd': {
 				if (optarg == nullptr) {
 					cerr << "Error: --directory requires an argument" << endl;
@@ -290,20 +302,27 @@ int main(int argc, char* argv[]) {
 				check_directory_for_changes(dir, dirFlags);
 				break;
 			}
+
+			//check cron jobs
 			case 'c':
 				check_cron_jobs_verbose();
 				break;
-			//MAKE FUNCTIONALITY FOR CHOOSING LOCATION
+			
+			//check path for vulnerabilities
 			case 'p': {
 				vector<string> paths = get_paths();
 				int problems = get_path_vulnerabilities(paths);
 				cout << "PATH scan complete. " << problems << " potential issue(s) found. Issues outputted to PATH.txt\n";
 				break;
 			}
+
+			//check firewall
 			case 'f': {
 				check_ufw();
 				break;
 			}
+
+			//unknown case
 			case '?': 
 				//apparently occurs when it gets an unknown flag? 
 				cerr << "Error: invalid argument \'" << argv[optind - 1] << "\'\n"; 
