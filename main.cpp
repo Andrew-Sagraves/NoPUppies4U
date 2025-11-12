@@ -70,7 +70,7 @@ int main(int argc, char* argv[]) {
 	
 	string logDir = "./";
 	
-	while ((opt = getopt_long(argc, argv, "hrwicpSagUd:L:ovk::s::b::NDP", long_options, &options_index)) != -1)
+	while ((opt = getopt_long(argc, argv, "hrwicpSagUd:L:ovk::s::b::NDP", long_options, &options_index)) != -1) {
 		
 		switch (opt) {
 			
