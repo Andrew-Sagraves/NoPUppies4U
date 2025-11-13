@@ -13,27 +13,47 @@ struct DirectoryCheckFlags {
     bool rootCheck = false;
     bool writeNew = false;
     bool ignoreHidden = false;
-    bool verbose = false;
 };
 
-//Loads original date modified times from a file for comparison into a map
+// Loads previous date modified times from a file into a map.
+// Parameters:
+//     dateModifiedFile - path to the stored timestamps file.
+// Returns:
+//     map of file path -> last modification time.
 map<string, time_t> load_previous_date_modified(const string& dateModifiedFile);
-//Recursively finds and stores all files in a directory and subdirectories in a vector
+// Recursively finds and returns all regular files in a directory and its subdirectories.
+// Parameters:
+//     directoryPath - root path to scan.
+//     ignoreHidden - if true, skip hidden files and directories.
+// Returns:
+//     vector of file paths found.
 vector<string> get_all_files_recursively(const string& directoryPath, bool ignoreHidden = false);
-//All in one function to create a date modified file and check against that file on subsequent runs
+// Check a directory for changed files, update stored timestamps, and optionally create a report.
+// Parameters:
+//     checkingDirectory - path to check.
+//     flags - behavior flags (rootCheck, writeNew, ignoreHidden).
 void check_directory_for_changes(const string& checkingDirectory, const DirectoryCheckFlags& flags = DirectoryCheckFlags());
 
-//Parses a specified log file for keywords and saves matching lines to a report.
+// Parse the given log file for any of the provided keywords and write matching lines to reportFile.
+// Parameters:
+//     logFilePath - path to the log file to parse.
+//     keywords - list of keywords to search for.
+//     reportFile - output file to store matching lines.
 void parse_log_file(const string& logFilePath, const vector<string>& keywords, const string& reportFile);
-//Parses /var/log/syslog for specific keywords.
+
+// Parse the system log (/var/log/syslog) for keywords and write to reportFile.
 void parse_system_logs(const vector<string>& keywords, const string& reportFile);
-//Parses /var/log/kern.log for specific keywords.
+
+// Parse the kernel log (/var/log/kern.log) for keywords and write to reportFile.
 void parse_kernel_logs(const vector<string>& keywords, const string& reportFile);
-//Parses /var/log/auth.log for specific keywords.
+
+// Parse the authentication log (/var/log/auth.log) for keywords and write to reportFile.
 void parse_authentication_logs(const vector<string>& keywords, const string& reportFile);
-//Parses /var/log/app.log for specific keywords.
+
+// Parse the application log (/var/log/app.log) for keywords and write to reportFile.
 void parse_application_logs(const vector<string>& keywords, const string& reportFile);
-//Parses all major logs for keywords and saves to respective reports.
+
+// Parse all major logs for keywords and save to respective reports.
 void parse_all_logs(const vector<string>& keywords, const string& reportFile);
 
 #endif

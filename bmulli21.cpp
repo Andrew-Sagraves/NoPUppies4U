@@ -158,7 +158,7 @@ void check_directory_for_changes(const string& checkingDirectory, const Director
     if (!newlyModifiedFiles.empty()) {
         cout << newlyModifiedFiles.size() << " file(s) have been modified or added." << endl;
 
-        if (flags.verbose) {
+        if (VERBOSE) {
             cout << "VERBOSE mode: printing modified files to console instead of creating report file." << endl;
             for (const string& fpath : newlyModifiedFiles) {
                 cout << fpath << endl;
